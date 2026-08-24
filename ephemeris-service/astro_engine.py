@@ -9,6 +9,20 @@ EPHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ephe')
 swe.set_ephe_path(EPHE_PATH)
 print(f"[astro_engine] EPHE_PATH={EPHE_PATH!r} isdir={os.path.isdir(EPHE_PATH)} "
       f"n_files={len(os.listdir(EPHE_PATH)) if os.path.isdir(EPHE_PATH) else 'n/a'}", flush=True)
+_probe = os.path.join(EPHE_PATH, 'seas_18.se1')
+try:
+    with open(_probe, 'rb') as _f:
+        _head = _f.read(8)
+    print(f"[astro_engine] probe open() OK, readable={os.access(_probe, os.R_OK)}, "
+          f"perms={oct(os.stat(_probe).st_mode)}, first8={_head!r}", flush=True)
+except Exception as _e:
+    print(f"[astro_engine] probe open() FAILED: {_e!r}", flush=True)
+try:
+    _jd_probe = swe.julday(1991, 4, 17, 17.0)
+    _pos = swe.calc_ut(_jd_probe, swe.CHIRON, swe.FLG_SWIEPH)
+    print(f"[astro_engine] probe swe.calc_ut(Chiron) OK: {_pos}", flush=True)
+except Exception as _e:
+    print(f"[astro_engine] probe swe.calc_ut(Chiron) FAILED: {_e!r}", flush=True)
 
 SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
 SIGN_GLYPH = ['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓']

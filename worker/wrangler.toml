@@ -1,3 +1,4 @@
 name = "de-caelo-chat"
 main = "chat-worker.js"
 compatibility_date = "2024-11-01"
+account_id = "d9d6fd6bcf51397233a9c56b51957eec"

@@ -7,14 +7,19 @@ requests/day).
 
 ## What it does
 
-The HTML page computes your real natal chart and the real current transits,
-progressions, and solar arc client-side (it already has Swiss Ephemeris data
-through 2034 embedded). When you ask a question in the Ask tab, it sends
-your question plus a compact summary of that real data to this Worker. The
-Worker adds a system prompt (tone, grounding rules, the instruction to say
-"nothing relevant" when that's true) and calls Claude with your API key.
-Nothing about your chart is stored anywhere except in your own browser's
-local storage, for conversation history.
+The frontend sends a question plus the user's own Supabase session (JWT) —
+nothing else. The Worker verifies that JWT against Supabase, then uses it
+(not a service-role key, not anything the client claims about its own chart)
+to re-fetch that user's `charts` row and the shared `sky_snapshots` row
+itself. Row Level Security applies to the Worker's request exactly as it
+does to the browser's, so this isn't the Worker trusting the client — it's
+Postgres enforcing that the Worker literally cannot pull another user's
+chart, even if it wanted to. The Worker builds the natal/transit/progression
+summary from that data server-side, adds a system prompt (tone, grounding
+rules, the instruction to say "nothing relevant" when that's true), calls
+Claude with your API key, and writes both the question and the reply into
+that user's own `chat_messages` rows (again, via the user's JWT — RLS-scoped
+the same way).
 
 ## Setup
 
@@ -35,40 +40,41 @@ local storage, for conversation history.
    wrangler deploy
    ```
    This prints a URL like `https://de-caelo-chat.YOUR-SUBDOMAIN.workers.dev`.
-   That's your `CHAT_ENDPOINT`.
+   That's your `EPHEMERIS_URL`-style endpoint — put it in `frontend/config.js`
+   as `CHAT_ENDPOINT`.
 
    If you'd rather not install anything: create a Worker in the Cloudflare
    dashboard (Workers & Pages → Create → Create Worker), paste the contents
    of `chat-worker.js` into the editor, and deploy from there instead.
 
-4. **Set your API key as a secret** (never plain text in the file):
+4. **Set secrets** (never plain text in the file):
    ```
    wrangler secret put ANTHROPIC_API_KEY
+   wrangler secret put SUPABASE_URL
+   wrangler secret put SUPABASE_ANON_KEY
    ```
-   Paste your key when prompted. Or in the dashboard: your Worker → Settings
-   → Variables → add an encrypted variable named `ANTHROPIC_API_KEY`.
+   `SUPABASE_URL` and `SUPABASE_ANON_KEY` aren't secret in the sense of
+   needing to be hidden — the frontend embeds the anon key too, since RLS is
+   the real access boundary, not secrecy of this key — but `wrangler secret
+   put` is the simplest way to set any Worker env var without editing this
+   file, so they're set the same way.
 
 5. **Optional — set an access key.** The Worker URL is callable by anyone who
-   finds it, since it has to be reachable from a plain static HTML page with
-   no login. Setting `CHAT_ACCESS_KEY` raises the bar from "anyone who finds
+   finds it. Setting `CHAT_ACCESS_KEY` raises the bar from "anyone who finds
    the URL" to "anyone who reads your page source," which is not real
    security but stops casual scraping:
    ```
    wrangler secret put CHAT_ACCESS_KEY
    ```
-   If you set this, put the exact same value in the `CHAT_ACCESS_KEY`
-   constant near the top of `natal_chart.html`. If you don't set it on the
-   Worker, leave the HTML constant blank too and the check is skipped
-   entirely.
+   If you set this, put the exact same value in `frontend/config.js` and
+   send it as the `X-Chat-Key` header. If you don't set it on the Worker,
+   skip the header entirely and the check is skipped.
 
-6. **Point the HTML at your Worker.** Open `natal_chart.html`, find:
-   ```js
-   window.CHAT_ENDPOINT = "";
-   window.CHAT_ACCESS_KEY = "";
-   ```
-   near the top, fill in your Worker URL (and access key if you set one),
-   save, and re-upload it to wherever you're hosting it. The Ask tab will
-   show setup instructions instead of the chat until this is filled in.
+6. **Point the frontend at your Worker.** In `frontend/config.js`, set
+   `CHAT_ENDPOINT` to your Worker URL. The Ask drawer sends `{question,
+   history}` in the body, `Authorization: Bearer <the user's Supabase
+   access token>` as a header (get it from `supabase.auth.getSession()`),
+   and `X-Chat-Key` only if you set `CHAT_ACCESS_KEY` above.
 
 ## Cost control
 
@@ -79,9 +85,10 @@ change `model: 'claude-sonnet-5'` to `'claude-haiku-4-5-20251001'` in
 
 ## If you want to lock it down further
 
-The access-key approach above is a deterrent, not real auth. If this ever
-becomes a problem (someone actually hammering your Worker), real options
-include: Cloudflare Access in front of the Worker route (free for a
-handful of users, adds an actual login), or IP allowlisting if you only
-ever use this from known networks. Neither is set up here, both are
-straightforward to add later if needed.
+The access-key approach above is a deterrent, not real auth — the real auth
+is the JWT verification described above. If the access key ever becomes a
+problem (someone actually hammering your Worker), real options include:
+Cloudflare Access in front of the Worker route (free for a handful of
+users, adds an actual login), or IP allowlisting if you only ever use this
+from known networks. Neither is set up here, both are straightforward to
+add later if needed.

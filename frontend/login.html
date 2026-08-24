@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>De Caelo — Log In</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+
+<div class="auth-screen">
+  <div class="auth-box">
+    <div class="auth-mark">DE CAELO</div>
+
+    <div id="loadingState">
+      <p class="lede" style="text-align:center;margin:0;">Checking session.</p>
+    </div>
+
+    <form id="setPasswordForm" style="display:none;">
+      <label for="pw1">Set a password</label>
+      <input type="password" id="pw1" autocomplete="new-password" required minlength="8"/>
+      <label for="pw2">Confirm password</label>
+      <input type="password" id="pw2" autocomplete="new-password" required minlength="8"/>
+      <button type="submit">Continue</button>
+      <div class="auth-error" id="setPasswordError"></div>
+    </form>
+
+    <form id="loginForm" style="display:none;">
+      <label for="email">Email</label>
+      <input type="email" id="email" autocomplete="username" required/>
+      <label for="password">Password</label>
+      <input type="password" id="password" autocomplete="current-password" required/>
+      <button type="submit">Log In</button>
+      <div class="auth-error" id="loginError"></div>
+      <div class="auth-note">Invite-only. If you don't have an account, you need an invite from an admin.</div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="login.js"></script>
+</body>
+</html>

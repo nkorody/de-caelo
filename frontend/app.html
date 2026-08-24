@@ -1,0 +1,1537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>De Caelo</title>
+<style>
+:root{
+  --ink:#000000; --ink-2:#000000; --ink-3:#0a0a0a; --ink-4:#ffffff;
+  --paper:#ffffff; --paper-dim:#c4c4c4; --paper-faint:#7a7a7a;
+  --red:#ffffff; --red-bright:#ffffff; --red-dim:#a0a0a0;
+  --verdigris:#e0e0e0; --verdigris-dim:#8a8a8a;
+  --brass:#ffffff; --brass-dim:#5a5a5a; --brass-bright:#ffffff;
+  --serif: "Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --mono: "IBM Plex Mono","JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--serif);
+  min-height:100vh;
+}
+#app{
+  max-width:1180px;margin:16px auto;padding:40px 34px 84px;
+  border:3px solid var(--ink-4);
+}
+
+.orn{flex-shrink:0; font-size:15px; line-height:1; color:var(--paper);}
+.orn::after{content:'\2767';}
+
+.tabs{
+  display:flex; flex-wrap:nowrap; gap:0; margin-bottom:24px;
+  border-bottom:3px solid var(--ink-4); overflow-x:auto;
+}
+.tab{
+  font-family:var(--mono); font-size:11px; letter-spacing:0.03em; text-transform:uppercase;
+  color:var(--paper-faint); background:transparent; border:none; border-bottom:3px solid transparent;
+  padding:9px 8px; cursor:pointer; transition:none;
+  white-space:nowrap; flex-shrink:0;
+}
+.tab:hover{color:var(--paper);}
+.tab.active{color:var(--ink); background:var(--paper); border-bottom-color:var(--paper);}
+
+.panel{display:none; animation:fadein .2s ease;}
+.panel.active{display:block;}
+@keyframes fadein{from{opacity:0;} to{opacity:1;}}
+
+.eyebrow{
+  font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+  color:var(--paper); font-weight:700; margin:0 0 8px;
+}
+h2.section-title{font-size:23px; font-weight:700; margin:0 0 4px; letter-spacing:0.02em; color:var(--paper); text-transform:uppercase;}
+p.lede{color:var(--paper-dim); font-size:15px; line-height:1.6; margin:0 0 22px; max-width:640px;}
+
+.card{
+  background:var(--ink); border:2px solid var(--ink-4); padding:18px 20px 20px; margin-bottom:16px;
+  position:relative;
+}
+.card-title{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; margin:0 0 12px; border-bottom:2px solid var(--ink-4); padding-bottom:8px;}
+
+.grid{display:grid; gap:14px;}
+.grid-2{grid-template-columns:1fr 1fr;}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+@media (max-width:760px){ .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;} }
+
+table{width:100%; border-collapse:collapse; font-size:15px;}
+th{
+  font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
+  color:var(--paper); text-align:left; padding:6px 10px; border-bottom:2px solid var(--ink-4);
+}
+td{padding:7px 10px; border-bottom:1px solid var(--brass-dim); color:var(--paper-dim);}
+tr:hover td{color:var(--ink); background:var(--paper);}
+td.glyph{font-size:17px; color:var(--paper); width:28px;}
+td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
+
+.pill{
+  display:inline-block; font-family:var(--mono); font-size:11px; padding:2px 7px; border-radius:0;
+  letter-spacing:0.03em; border:1px solid var(--paper);
+}
+.pill.soft{background:transparent; color:var(--paper);}
+.pill.hard{background:var(--paper); color:var(--ink); font-weight:700;}
+.pill.neutral{background:transparent; color:var(--paper-dim); border-style:dashed;}
+.pill.minor{background:transparent; color:var(--paper-faint); border-color:var(--brass-dim);}
+.pill.creative{background:transparent; color:var(--paper); border-style:dotted;}
+.pill.tense{background:transparent; color:var(--paper); border-width:2px;}
+
+.bigthree{display:flex; gap:22px; flex-wrap:wrap; margin-bottom:8px;}
+.bigthree .item{flex:1; min-width:160px;}
+.bigthree .glyph-big{font-size:36px; color:var(--paper); line-height:1;}
+.bigthree .label{font-family:var(--mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--paper-faint); margin-top:6px;}
+.bigthree .value{font-size:17px; margin-top:2px;}
+
+.bar-row{display:flex; align-items:center; gap:10px; margin-bottom:7px; font-family:var(--mono); font-size:12px;}
+.bar-row .label{width:70px; color:var(--paper-faint);}
+.bar-track{flex:1; height:8px; background:var(--ink); border:1px solid var(--brass-dim); position:relative;}
+.bar-fill{height:100%; background:var(--paper);}
+.bar-row .count{width:20px; text-align:right; color:var(--paper-dim);}
+
+.wheel-wrap{display:flex; justify-content:center; padding:10px 0 14px; position:relative;}
+.wheel-wrap svg{max-width:100%; height:auto;}
+
+.chain-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--mono); font-size:14px; margin-bottom:10px;}
+.chain-node{padding:3px 9px; background:var(--ink); border:1px solid var(--paper); color:var(--paper);}
+.chain-arrow{color:var(--paper);}
+
+.hor-subtabs{display:flex; gap:6px; margin-bottom:16px;}
+.hor-subtab{
+  font-family:var(--mono); font-size:12px; letter-spacing:0.06em; text-transform:uppercase;
+  padding:7px 14px; background:var(--ink); border:1px solid var(--ink-4); color:var(--paper-faint); cursor:pointer;
+}
+.hor-subtab.active{color:var(--ink); background:var(--paper); border-color:var(--paper); font-weight:700;}
+.hor-nav{display:flex; align-items:center; gap:12px; margin-bottom:16px; font-family:var(--mono); font-size:13px;}
+.hor-nav button{
+  background:var(--ink); border:1px solid var(--paper); color:var(--paper); padding:5px 11px; cursor:pointer; font-family:var(--mono);
+}
+.hor-nav button:hover{background:var(--paper); color:var(--ink);}
+.hor-date{color:var(--paper); letter-spacing:0.03em;}
+
+.hor-text{white-space:pre-line; line-height:1.75; font-size:15.5px; color:var(--paper-dim);}
+.hor-text b, .hor-lede{color:var(--paper);}
+
+.reading{font-size:15.5px; line-height:1.75; color:var(--paper-dim); margin:0 0 14px;}
+.reading:last-child{margin-bottom:0;}
+.reading-card{
+  background:var(--ink); padding:15px 20px 16px 22px; margin-bottom:12px; position:relative;
+  border-top:1px solid var(--ink-4); border-right:1px solid var(--ink-4); border-bottom:1px solid var(--ink-4);
+}
+.reading-card::before{
+  content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--paper);
+}
+.reading-card .rc-head{font-family:var(--mono); font-size:12px; letter-spacing:0.04em; color:var(--paper); font-weight:700; margin-bottom:7px;}
+.reading-card .rc-head .orb{color:var(--paper-faint); font-weight:normal;}
+details.more{margin-top:18px;}
+details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; cursor:pointer; padding:8px 0;}
+
+.divider{display:flex; align-items:center; gap:12px; margin:28px 0 20px; opacity:0.9;}
+.divider .line{flex:1; height:1px; background:var(--brass-dim);}
+
+.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:28px; line-height:1.7; border-top:3px solid var(--ink-4); padding-top:14px;}
+
+.harm-select{display:flex; gap:8px; margin-bottom:16px;}
+.harm-btn{font-family:var(--mono); font-size:13px; padding:6px 14px; background:var(--ink); border:1px solid var(--ink-4); color:var(--paper-faint); cursor:pointer;}
+.harm-btn.active{color:var(--ink); background:var(--paper); border-color:var(--paper); font-weight:700;}
+
+/* glossary tooltips */
+.term{border-bottom:1px dotted var(--paper-faint); cursor:help; position:relative;}
+.term .term-tip{
+  visibility:hidden; opacity:0; position:absolute; left:50%; bottom:calc(100% + 9px); transform:translateX(-50%);
+  background:#000000; border:2px solid var(--paper); color:#ffffff; font-size:13px; line-height:1.5;
+  padding:9px 11px; width:240px; max-width:62vw; z-index:80; transition:opacity .12s ease; pointer-events:none;
+  font-family:var(--serif); text-transform:none; letter-spacing:normal; font-variant:normal; text-align:left;
+}
+.term .term-tip::after{content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:var(--paper);}
+.term:hover .term-tip, .term:focus .term-tip{visibility:visible; opacity:1;}
+
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-thumb{background:var(--paper-faint);}
+
+
+</style>
+</head>
+<body>
+<div id="loadingScreen" style="position:fixed;inset:0;z-index:1000;display:flex;align-items:center;justify-content:center;background:var(--ink);padding:20px;text-align:center;">
+  <div>
+    <div class="eyebrow" id="loadingText">Loading your chart</div>
+    <div class="footnote" id="loadingDetail" style="border-top:none;margin-top:10px;"></div>
+  </div>
+</div>
+<div id="app" style="display:none;">
+  <button id="oracleToggle" class="oracle-fab">Ask &#8599;</button>
+  <div class="tabs" id="tabs"></div>
+  <div id="panels"></div>
+  <div class="footnote">
+    Positions from the Swiss Ephemeris (JPL DE-derived), including the full fixed-star catalog. Transit and horoscope data run 2024 to 2034 daily. Progressions and solar arc compute live for any date, age 0 to 105, using the day-for-a-year method. Houses are Placidus, with whole-sign shown alongside. Reload periodically to extend the transit window past 2034.
+  </div>
+</div>
+
+<div class="scrim" id="oracleScrim"></div>
+<div class="oracle-drawer" id="oracleDrawer">
+  <div class="oracle-drawer-head"><span>Ask</span><button id="oracleClose">&times;</button></div>
+  <div class="oracle-drawer-body" id="oracleBody">
+    <p class="reading" style="font-size:13.5px;">Answered from your actual chart and the real sky today, not a generic model.</p>
+  </div>
+  <form class="oracle-form" id="oracleForm">
+    <textarea id="oracleInput" placeholder="Ask anything&hellip;" required></textarea>
+    <button type="submit" id="oracleSend">Ask</button>
+  </form>
+</div>
+
+<style>
+  .oracle-fab{position:fixed; bottom:20px; right:20px; z-index:150; font-family:var(--mono); font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:11px 18px; background:var(--paper); color:var(--ink); border:2px solid var(--paper); cursor:pointer; font-weight:700;}
+  .oracle-fab:hover{background:var(--ink); color:var(--paper);}
+  .scrim{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:190; display:none;}
+  .scrim.show{display:block;}
+  .oracle-drawer{position:fixed; top:0; right:-420px; width:400px; max-width:92vw; height:100%; background:var(--ink); border-left:3px solid var(--paper); z-index:200; transition:right .25s ease; display:flex; flex-direction:column;}
+  .oracle-drawer.open{right:0;}
+  .oracle-drawer-head{display:flex; justify-content:space-between; align-items:center; padding:20px 22px; border-bottom:2px solid var(--ink-4); font-family:var(--mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; font-weight:700;}
+  .oracle-drawer-head button{background:none; border:none; color:var(--paper); font-size:20px; cursor:pointer; line-height:1;}
+  .oracle-drawer-body{padding:22px; flex:1; display:flex; flex-direction:column; gap:16px; overflow-y:auto;}
+  .oracle-msg{font-size:14.5px; line-height:1.6;}
+  .oracle-msg.user{color:var(--paper); font-weight:700;}
+  .oracle-msg.assistant{color:var(--paper-dim); border-left:3px solid var(--paper); padding-left:14px;}
+  .oracle-msg.error{color:var(--paper-faint); font-style:italic;}
+  .oracle-form{display:flex; flex-direction:column; gap:10px; padding:16px 22px 22px; border-top:2px solid var(--ink-4);}
+  .oracle-form textarea{background:var(--ink); border:2px solid var(--ink-4); color:var(--paper); font-family:var(--serif); font-size:14.5px; padding:12px; min-height:70px; resize:vertical;}
+  .oracle-form textarea:focus{outline:none; border-color:var(--paper);}
+  .oracle-form button{font-family:var(--mono); font-size:12px; letter-spacing:0.08em; text-transform:uppercase; background:var(--paper); color:var(--ink); border:2px solid var(--paper); padding:11px; cursor:pointer; font-weight:700;}
+  .oracle-form button:hover{background:var(--ink); color:var(--paper);}
+  .oracle-form button:disabled{opacity:0.5; cursor:default;}
+</style>
+
+<script>
+// Astro Engine — client-side transit/horoscope logic, sourced from precomputed Swiss Ephemeris data.
+
+const SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SIGN_GLYPH = {'Aries':'\u2648','Taurus':'\u2649','Gemini':'\u264A','Cancer':'\u264B','Leo':'\u264C','Virgo':'\u264D','Libra':'\u264E','Scorpio':'\u264F','Sagittarius':'\u2650','Capricorn':'\u2651','Aquarius':'\u2652','Pisces':'\u2653'};
+const BODY_GLYPH = {'Sun':'\u2609','Moon':'\u263D','Mercury':'\u263F','Venus':'\u2640','Mars':'\u2642','Jupiter':'\u2643','Saturn':'\u2644','Uranus':'\u2645','Neptune':'\u2646','Pluto':'\u2647','Chiron':'\u26B7','North Node':'\u260A','South Node':'\u260B','Ascendant':'AC','Midheaven':'MC'};
+
+function norm360(x){ x = x % 360; return x < 0 ? x + 360 : x; }
+function angularSep(a,b){ const d = Math.abs(norm360(a)-norm360(b)); return Math.min(d, 360-d); }
+function degToSign(lon){
+  lon = norm360(lon);
+  const idx = Math.floor(lon/30);
+  const pos = lon - idx*30;
+  const d = Math.floor(pos);
+  const m = Math.floor((pos-d)*60);
+  return {sign: SIGNS[idx], glyph: SIGN_GLYPH[SIGNS[idx]], deg: d, min: m, signLon: pos, absLon: lon};
+}
+function fmtDeg(lon){ const p = degToSign(lon); return `${p.deg}\u00b0${String(p.min).padStart(2,'0')}' ${p.sign}`; }
+
+const MAJOR_ASPECTS = [
+  {name:'Conjunction', angle:0}, {name:'Opposition', angle:180}, {name:'Trine', angle:120},
+  {name:'Square', angle:90}, {name:'Sextile', angle:60}, {name:'Quincunx', angle:150},
+];
+
+const SPEED_CLASS = {
+  'Moon':'fast', 'Sun':'personal','Mercury':'personal','Venus':'personal','Mars':'personal',
+  'Jupiter':'social','Saturn':'social','Uranus':'outer','Neptune':'outer','Pluto':'outer','Chiron':'outer','North Node':'outer'
+};
+const TRANSIT_ORB = {fast:4.0, personal:3.0, social:2.0, outer:1.5};
+
+function houseOf(lon, cusps){
+  lon = norm360(lon);
+  const c = cusps.map(norm360);
+  for(let i=0;i<12;i++){
+    const start=c[i], end=c[(i+1)%12];
+    if(start<end){ if(lon>=start && lon<end) return i+1; }
+    else { if(lon>=start || lon<end) return i+1; }
+  }
+  return 12;
+}
+
+// Cross-set aspects: transiting bodies (dict name->lon) vs natal points (dict name->lon)
+function transitAspects(transLons, natalLons, orbTable){
+  const out = [];
+  for(const tName in transLons){
+    const cls = SPEED_CLASS[tName] || 'personal';
+    const orbMax = (orbTable||TRANSIT_ORB)[cls];
+    for(const nName in natalLons){
+      const sep = angularSep(transLons[tName], natalLons[nName]);
+      for(const asp of MAJOR_ASPECTS){
+        const delta = Math.abs(sep-asp.angle);
+        if(delta<=orbMax){
+          out.push({transiting:tName, natal:nName, aspect:asp.name, orb:+delta.toFixed(3), speedClass:cls});
+          break;
+        }
+      }
+    }
+  }
+  out.sort((a,b)=>a.orb-b.orb);
+  return out;
+}
+
+class AstroData {
+  constructor(natal, transits, progressions){
+    this.natal = natal;
+    this.transits = transits;
+    this.progressions = progressions;
+    this._dateIndex = {};
+    transits.dates.forEach((d,i)=>this._dateIndex[d]=i);
+    this.natalLons = {};
+    for(const k in natal.points) this.natalLons[k] = natal.points[k].lon;
+  }
+  dateRange(){ return {start:this.transits.start, end:this.transits.end}; }
+  clampDate(dateStr){
+    if(dateStr < this.transits.start) return this.transits.start;
+    if(dateStr > this.transits.end) return this.transits.end;
+    return dateStr;
+  }
+  indexFor(dateStr){
+    dateStr = this.clampDate(dateStr);
+    if(this._dateIndex[dateStr]!==undefined) return this._dateIndex[dateStr];
+    // fallback: nearest by string compare (shouldn't happen, dates are daily contiguous)
+    const idx = this.transits.dates.findIndex(d=>d>=dateStr);
+    return idx<0 ? this.transits.dates.length-1 : idx;
+  }
+  positionsAt(idx){
+    const out = {};
+    for(const b of this.transits.bodies) out[b] = this.transits.lon[b][idx];
+    return out;
+  }
+  speedsAt(idx){
+    const out = {};
+    for(const b of this.transits.bodies) out[b] = this.transits.speed[b][idx];
+    return out;
+  }
+  moonPhase(idx){
+    const pos = this.positionsAt(idx);
+    const angle = norm360(pos['Moon']-pos['Sun']);
+    const illum = (1-Math.cos(angle*Math.PI/180))/2*100;
+    let phase;
+    if(angle<11.25||angle>=348.75) phase='New Moon';
+    else if(angle<78.75) phase='Waxing Crescent';
+    else if(angle<101.25) phase='First Quarter';
+    else if(angle<168.75) phase='Waxing Gibbous';
+    else if(angle<191.25) phase='Full Moon';
+    else if(angle<258.75) phase='Waning Gibbous';
+    else if(angle<281.75) phase='Last Quarter';
+    else phase='Waning Crescent';
+    return {phase, illum:+illum.toFixed(1), angle:+angle.toFixed(2)};
+  }
+  ingressesBetween(startIdx, endIdx){
+    const out = [];
+    for(const b of this.transits.bodies){
+      for(let i=Math.max(1,startIdx); i<=endIdx; i++){
+        const s0 = Math.floor(norm360(this.transits.lon[b][i-1])/30);
+        const s1 = Math.floor(norm360(this.transits.lon[b][i])/30);
+        if(s0!==s1){
+          out.push({body:b, date:this.transits.dates[i], intoSign: SIGNS[s1]});
+        }
+      }
+    }
+    return out;
+  }
+  stationsBetween(startIdx, endIdx){
+    const out = [];
+    for(const b of this.transits.bodies){
+      if(b==='Moon'||b==='Sun'||b==='North Node'||b==='South Node') continue;
+      for(let i=Math.max(1,startIdx); i<=endIdx; i++){
+        const sp0 = this.transits.speed[b][i-1], sp1 = this.transits.speed[b][i];
+        if(Math.sign(sp0)!==Math.sign(sp1) && sp0!==0){
+          out.push({body:b, date:this.transits.dates[i], turning: sp1<0 ? 'retrograde' : 'direct'});
+        }
+      }
+    }
+    return out;
+  }
+  ageYearsAt(dateStr){
+    const d = new Date(dateStr+'T00:00:00Z');
+    const b = this.natal.birth;
+    const bd = new Date(Date.UTC(b.year, b.month-1, b.day));
+    return (d-bd)/(1000*3600*24*365.2425);
+  }
+  progressedPositions(dateStr){
+    const age = Math.max(0, Math.min(this.progressions.max_age, this.ageYearsAt(dateStr)));
+    const lo = Math.floor(age), hi = Math.min(this.progressions.max_age, lo+1);
+    const frac = age-lo;
+    const lerp = (arr)=> arr[lo] + (arr[hi]-arr[lo])*frac;
+    const out = {};
+    for(const b of Object.keys(this.progressions.lon)) out[b] = norm360(lerp(this.progressions.lon[b]));
+    out['Ascendant'] = norm360(lerp(this.progressions.ascendant));
+    out['Midheaven'] = norm360(lerp(this.progressions.midheaven));
+    return {positions: out, age};
+  }
+  solarArc(dateStr){
+    const {positions, age} = this.progressedPositions(dateStr);
+    const arc = norm360(positions['Sun'] - this.natalLons['Sun']);
+    const directed = {};
+    for(const k in this.natalLons) directed[k] = norm360(this.natalLons[k]+arc);
+    return {arcDeg: arc, directed, age};
+  }
+}
+
+const AstroLibExports = {AstroData, norm360, angularSep, degToSign, fmtDeg, houseOf, transitAspects, SIGNS, SIGN_GLYPH, BODY_GLYPH, MAJOR_ASPECTS, SPEED_CLASS, TRANSIT_ORB};
+if(typeof module !== 'undefined') module.exports = AstroLibExports;
+if(typeof window !== 'undefined') window.AstroLib = AstroLibExports;
+
+</script>
+<script>
+if(typeof module !== 'undefined'){
+  var _AL = require('./astro-lib.js');
+  var norm360=_AL.norm360, angularSep=_AL.angularSep, degToSign=_AL.degToSign, fmtDeg=_AL.fmtDeg, houseOf=_AL.houseOf, transitAspects=_AL.transitAspects;
+}
+
+const TRANSIT_THEME = {
+  Sun:'a pulse of attention and vitality', Moon:'an emotional undercurrent',
+  Mercury:'a shift in thinking, talk, or logistics', Venus:'a pull toward pleasure, value, or relationship',
+  Mars:'a surge of drive, friction, or assertion', Jupiter:'an expansion, an opening, or an overreach',
+  Saturn:'a test of structure, commitment, or limitation', Uranus:'a disruption or a break from pattern',
+  Neptune:'a dissolving of boundary, an idealization, or a fog', Pluto:'an intensification or a shift in power',
+  Chiron:'contact with an old wound and what it has taught', 'North Node':'a pull toward unfamiliar, forward terrain',
+};
+const NATAL_DOMAIN = {
+  Sun:'your core identity and vitality', Moon:'your emotional instincts and sense of safety',
+  Mercury:'your thinking and communication', Venus:'what you love and value', Mars:'your drive and assertion',
+  Jupiter:'your sense of meaning and expansion', Saturn:'your discipline and long-term structures',
+  Uranus:'your need for independence and change', Neptune:'your imagination and ideals',
+  Pluto:'your relationship to power and transformation', Chiron:'your oldest wound',
+  'North Node':'your growth edge', 'South Node':'your default, well-worn habits',
+  Ascendant:'how you meet the world', Midheaven:'your public direction and vocation',
+  Descendant:'your one-to-one relationships', 'Black Moon Lilith':'your untamed instinct',
+  Ceres:'how you nurture and are nurtured', Pallas:'your strategic intelligence',
+  Juno:'your capacity for committed partnership', Vesta:'what you devote yourself to',
+  Vertex:'your point of fated encounter',
+};
+const ASPECT_MODE = {
+  Conjunction:'merges directly with', Opposition:'pulls against, in open tension with',
+  Square:'grinds against, forcing action from', Trine:'flows easily with, lending support to',
+  Sextile:'offers a workable opening to', Quincunx:'sits at an awkward angle to, asking for adjustment from',
+};
+const HOUSE_DOMAIN = {
+  1:'self-presentation and initiative', 2:'money, resources, and self-worth', 3:'communication, siblings, and immediate environment',
+  4:'home, family, and psychological foundation', 5:'creativity, romance, and self-expression', 6:'work, health, and daily routine',
+  7:'partnership and open contracts', 8:'shared resources, intimacy, and transformation', 9:'belief, travel, and long-range meaning',
+  10:'career, reputation, and public direction', 11:'community, networks, and long-term goals', 12:'the unconscious, retreat, and what is hidden',
+};
+
+const ANGLE_HOUSE = {'Ascendant':1, 'Descendant':7, 'Midheaven':10, 'Imum Coeli':4};
+function houseFor(name, natal){
+  if(ANGLE_HOUSE[name]!==undefined) return ANGLE_HOUSE[name];
+  const p = natal.points[name];
+  if(p && p.house_placidus) return p.house_placidus;
+  if(name==='Vertex') return houseOf(natal.points['Vertex'].lon, natal.houses_placidus.cusps);
+  return null;
+}
+function natalPointLabel(name, natal){
+  const p = natal.points[name];
+  if(!p) return name;
+  const h = houseFor(name, natal);
+  return `${name} (${p.deg}\u00b0${String(p.min).padStart(2,'0')}' ${p.sign}${h?', house '+h:''})`;
+}
+
+const ASPECT_ANGLE = Object.fromEntries(MAJOR_ASPECTS.map(x=>[x.name,x.angle]));
+const MONTH_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const WEEKDAY_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+function weekdayShort(dateStr){ return WEEKDAY_SHORT[new Date(dateStr+'T00:00:00Z').getUTCDay()]; }
+function niceDate(dateStr){ const [y,m,d] = dateStr.split('-').map(Number); return `${MONTH_SHORT[m-1]} ${d}`; }
+
+// Daily ephemeris samples are taken once per day; interpolate linearly between the two
+// samples straddling exactitude to estimate the day and local clock time an aspect perfects.
+function findExactCrossing(ad, transiting, natalLon, aspectAngle, centerIdx, windowDays){
+  windowDays = windowDays || 5;
+  const lonArr = ad.transits.lon[transiting];
+  const N = lonArr.length;
+  const signedOrb = i => angularSep(lonArr[i], natalLon) - aspectAngle;
+  const lo = Math.max(0, centerIdx-windowDays), hi = Math.min(N-2, centerIdx+windowDays-1);
+  for(let i=lo; i<=hi; i++){
+    const a = signedOrb(i), b = signedOrb(i+1);
+    if(a===0) return {idx:i, frac:0};
+    if((a<0)!==(b<0)) return {idx:i, frac: a/(a-b)};
+  }
+  return null;
+}
+function crossingToLocal(ad, crossing){
+  if(!crossing) return null;
+  const base = new Date(ad.transits.dates[crossing.idx]+'T00:00:00Z');
+  base.setUTCMinutes(base.getUTCMinutes() + Math.round(crossing.frac*24*60));
+  const offsetMs = (ad.natal.birth.utc_offset||0)*3600*1000;
+  const local = new Date(base.getTime()+offsetMs);
+  const dateStr = local.toISOString().slice(0,10);
+  let h = local.getUTCHours(), min = local.getUTCMinutes();
+  const ampm = h>=12 ? 'PM' : 'AM';
+  let h12 = h%12; if(h12===0) h12=12;
+  return {date:dateStr, time:`${h12}:${String(min).padStart(2,'0')} ${ampm}`, weekday: weekdayShort(dateStr)};
+}
+function aspectWhen(ad, a){
+  if(a.idx===undefined) return null;
+  return crossingToLocal(ad, findExactCrossing(ad, a.transiting, ad.natalLons[a.natal], ASPECT_ANGLE[a.aspect], a.idx));
+}
+// A light, heuristic read of an aspect list's overall character. Used sparingly, not per-aspect.
+function reportTenor(aspects){
+  if(!aspects || aspects.length < 2) return null;
+  const hard = aspects.filter(a=>a.aspect==='Square'||a.aspect==='Opposition').length;
+  const easy = aspects.filter(a=>a.aspect==='Trine'||a.aspect==='Sextile').length;
+  const conj = aspects.filter(a=>a.aspect==='Conjunction').length;
+  const outer = aspects.filter(a=>SPEED_CLASS[a.transiting]==='outer').length;
+  if(hard >= easy+2) return 'More friction than flow here: this stretch asks for effort rather than offering ease.';
+  if(easy >= hard+2) return 'More flow than friction: conditions are broadly cooperative.';
+  if(outer >= 2) return 'The slower planets are doing most of the talking, so what moves here tends to be structural, not quick.';
+  if(conj >= 2) return 'Several currents are converging at once rather than arriving one at a time.';
+  return 'A mixed stretch, with no single current dominating.';
+}
+
+function describeAspect(ad, a){
+  const natal = ad.natal;
+  const house = houseFor(a.natal, natal);
+  const domain = NATAL_DOMAIN[a.natal] || (house ? HOUSE_DOMAIN[house] : 'this part of the chart');
+  const theme = TRANSIT_THEME[a.transiting] || 'a current';
+  const mode = ASPECT_MODE[a.aspect] || 'contacts';
+  const when = aspectWhen(ad, a);
+  let exact;
+  if(when){
+    exact = ` Exact ${when.weekday}, ${niceDate(when.date)}, around ${when.time}.`;
+  } else if(a.idx!==undefined){
+    const d = ad.transits.dates[a.idx];
+    exact = a.orb<0.35 ? ` Nearly exact ${weekdayShort(d)}, ${niceDate(d)}.` : (a.orb<1 ? ` Closest ${weekdayShort(d)}, ${niceDate(d)}.` : '');
+  } else {
+    exact = a.orb < 0.35 ? ' Exact within a third of a degree.' : (a.orb < 1 ? ' Close to exact.' : '');
+  }
+  return `Transiting ${a.transiting} ${mode} your natal ${natalPointLabel(a.natal, natal)}, orb ${a.orb.toFixed(2)}\u00b0.${exact} It brings ${theme} to bear on ${domain}.`;
+}
+
+function dailyReport(ad, dateStr){
+  dateStr = ad.clampDate(dateStr);
+  const idx = ad.indexFor(dateStr);
+  const pos = ad.positionsAt(idx);
+  const moon = ad.moonPhase(idx);
+  const moonSign = degToSign(pos['Moon']);
+  const moonHouse = houseOf(pos['Moon'], ad.natal.houses_placidus.cusps);
+  const aspects = transitAspects(pos, ad.natalLons).filter(a=>a.transiting!=='South Node');
+  const top = aspects.slice(0,6).map(a=>({...a, idx}));
+  const stations = ad.stationsBetween(Math.max(0,idx-1), Math.min(ad.transits.dates.length-1, idx+1));
+  const ingresses = ad.ingressesBetween(Math.max(0,idx-1), Math.min(ad.transits.dates.length-1, idx+1))
+                       .filter(x=>x.date===dateStr);
+
+  let lines = [];
+  lines.push(`The Moon stands at ${fmtDeg(pos['Moon'])}, in your natal ${moonHouse}${ordinalSuffix(moonHouse)} house, ${moon.phase.toLowerCase()} (${moon.illum}% illuminated).`);
+  if(stations.length){
+    stations.forEach(s=>lines.push(`${s.body} turns ${s.turning} today.`));
+  }
+  if(ingresses.length){
+    ingresses.forEach(x=>lines.push(`${x.body} enters ${x.intoSign} today.`));
+  }
+  if(top.length===0){
+    lines.push('No major transiting aspect is exact today. A quiet stretch, closer to maintenance than event.');
+  } else {
+    lines.push('');
+    const tenor = reportTenor(top);
+    if(tenor) lines.push(tenor);
+    lines.push("Today's contacts, closest first:");
+    top.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+  }
+  return {date:dateStr, moon, moonSign, moonHouse, aspects: top, stations, ingresses, text: lines.join('\n')};
+}
+
+function weeklyReport(ad, startDateStr){
+  startDateStr = ad.clampDate(startDateStr);
+  const startIdx = ad.indexFor(startDateStr);
+  const endIdx = Math.min(ad.transits.dates.length-1, startIdx+6);
+  const endDate = ad.transits.dates[endIdx];
+
+  // Moon's path through the week
+  const moonPath = [];
+  let lastSign = null;
+  for(let i=startIdx;i<=endIdx;i++){
+    const s = degToSign(ad.transits.lon['Moon'][i]).sign;
+    if(s!==lastSign){ moonPath.push({date:ad.transits.dates[i], sign:s}); lastSign = s; }
+  }
+
+  // Aggregate tightest instance of each unique (transiting,natal,aspect) across the week
+  const seen = {};
+  for(let i=startIdx;i<=endIdx;i++){
+    const pos = ad.positionsAt(i);
+    const asps = transitAspects(pos, ad.natalLons).filter(a=>a.transiting!=='Moon' && a.transiting!=='South Node');
+    asps.forEach(a=>{
+      const key = a.transiting+'|'+a.natal+'|'+a.aspect;
+      if(!seen[key] || a.orb < seen[key].orb) seen[key] = {...a, idx:i};
+    });
+  }
+  const weekAspects = Object.values(seen).sort((a,b)=>a.orb-b.orb).slice(0,8);
+
+  const ingresses = ad.ingressesBetween(startIdx, endIdx);
+  const stations = ad.stationsBetween(startIdx, endIdx);
+
+  let lines = [];
+  lines.push(`The Moon opens the week at ${moonPath[0].sign} and moves through ${moonPath.length} sign${moonPath.length>1?'s':''} by ${endDate}.`);
+  moonPath.forEach(m=>lines.push(`\u2022 ${m.sign} from ${m.date}`));
+  if(stations.length){ lines.push(''); stations.forEach(s=>lines.push(`${s.body} turns ${s.turning} on ${s.date}.`)); }
+  if(ingresses.length){ lines.push(''); ingresses.forEach(x=>lines.push(`${x.body} enters ${x.intoSign} on ${x.date}.`)); }
+  lines.push('');
+  const tenor = reportTenor(weekAspects);
+  if(tenor) lines.push(tenor);
+  lines.push("This week's standing contacts, closest first:");
+  if(weekAspects.length===0) lines.push('Nothing exact from the slower planets this week. The Moon carries the week on its own.');
+  weekAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+
+  return {start:startDateStr, end:endDate, moonPath, aspects: weekAspects, ingresses, stations, text: lines.join('\n')};
+}
+
+function monthlyReport(ad, monthStr){ // 'YYYY-MM'
+  const [y,m] = monthStr.split('-').map(Number);
+  const first = `${monthStr}-01`;
+  const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const lastStr = `${monthStr}-${String(lastDay).padStart(2,'0')}`;
+  const startIdx = ad.indexFor(ad.clampDate(first));
+  const endIdx = ad.indexFor(ad.clampDate(lastStr));
+
+  const seen = {};
+  for(let i=startIdx;i<=endIdx;i++){
+    const pos = ad.positionsAt(i);
+    const asps = transitAspects(pos, ad.natalLons).filter(a=>['Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Sun'].includes(a.transiting));
+    asps.forEach(a=>{
+      const key = a.transiting+'|'+a.natal+'|'+a.aspect;
+      if(!seen[key] || a.orb < seen[key].orb) seen[key] = {...a, idx:i};
+    });
+  }
+  const monthAspects = Object.values(seen).sort((a,b)=>a.orb-b.orb).slice(0,10);
+  const ingresses = ad.ingressesBetween(startIdx, endIdx);
+  const stations = ad.stationsBetween(startIdx, endIdx);
+
+  // New/full moons within month
+  const lunations = [];
+  let prevAngle = null;
+  for(let i=startIdx;i<=endIdx;i++){
+    const mp = ad.moonPhase(i);
+    if(prevAngle!==null){
+      if(prevAngle>350 && mp.angle<10) lunations.push({date:ad.transits.dates[i], type:'New Moon', sign: degToSign(ad.transits.lon['Moon'][i]).sign});
+      if(prevAngle<180 && mp.angle>=180) lunations.push({date:ad.transits.dates[i], type:'Full Moon', sign: degToSign(ad.transits.lon['Moon'][i]).sign});
+    }
+    prevAngle = mp.angle;
+  }
+
+  // Progressions / solar arc status for this month (use the 15th as representative date)
+  const midDate = `${monthStr}-15`;
+  const sa = ad.solarArc(ad.clampDate(midDate));
+  const progPos = ad.progressedPositions(ad.clampDate(midDate)).positions;
+  const progAspects = transitAspects(progPos, ad.natalLons, {fast:1.2, personal:1.2, social:1.2, outer:1.2})
+                        .filter(a=>a.orb<1.2 && a.transiting!==a.natal).slice(0,5);
+  const saAspects = transitAspects(sa.directed, ad.natalLons, {fast:1.0, personal:1.0, social:1.0, outer:1.0})
+                        .filter(a=>a.orb<1.0 && a.transiting!==a.natal && a.transiting!=='South Node').slice(0,5);
+
+  let lines = [];
+  lines.push(`Age ${sa.age.toFixed(1)}. Solar arc for the year stands at ${sa.arcDeg.toFixed(2)}\u00b0.`);
+  if(stations.length){ lines.push(''); stations.forEach(s=>lines.push(`${s.body} turns ${s.turning} on ${s.date}.`)); }
+  if(ingresses.length){ lines.push(''); lines.push('Sign changes this month:'); ingresses.forEach(x=>lines.push(`\u2022 ${x.body} into ${x.intoSign}, ${x.date}`)); }
+  if(lunations.length){ lines.push(''); lunations.forEach(l=>lines.push(`${l.type} in ${l.sign}, ${l.date}.`)); }
+  lines.push('');
+  const tenor = reportTenor(monthAspects);
+  if(tenor) lines.push(tenor);
+  lines.push("This month's standing transits, closest first:");
+  monthAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+  if(progAspects.length){
+    lines.push('');
+    lines.push('Progressions in effect this year:');
+    progAspects.forEach(a=>lines.push(`\u2022 Progressed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0.`));
+  }
+  if(saAspects.length){
+    lines.push('');
+    lines.push('Solar arc directions in effect this year:');
+    saAspects.forEach(a=>lines.push(`\u2022 Directed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0.`));
+  }
+
+  return {month:monthStr, aspects:monthAspects, ingresses, stations, lunations, progAspects, saAspects, age:sa.age, solarArc:sa.arcDeg, text: lines.join('\n')};
+}
+
+function ordinalSuffix(n){
+  const s=['th','st','nd','rd'], v=n%100;
+  return s[(v-20)%10]||s[v]||s[0];
+}
+
+if(typeof module!=='undefined') module.exports = {dailyReport, weeklyReport, monthlyReport, describeAspect};
+
+</script>
+<script>
+const TXT = ch => ch + '\uFE0E';
+const WHEEL_BODIES = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Chiron','North Node','South Node','Black Moon Lilith'];
+const WHEEL_GLYPH = {'Sun':TXT('\u2609'),'Moon':TXT('\u263D'),'Mercury':TXT('\u263F'),'Venus':TXT('\u2640'),'Mars':TXT('\u2642'),'Jupiter':TXT('\u2643'),'Saturn':TXT('\u2644'),'Uranus':TXT('\u2645'),'Neptune':TXT('\u2646'),'Pluto':TXT('\u2647'),'Chiron':TXT('\u26B7'),'North Node':TXT('\u260A'),'South Node':TXT('\u260B'),'Black Moon Lilith':TXT('\u26B8')};
+const WHEEL_SIGN_GLYPH = ['\u2648','\u2649','\u264A','\u264B','\u264C','\u264D','\u264E','\u264F','\u2650','\u2651','\u2652','\u2653'].map(TXT);
+
+// Engraving palette: black, white, grey only
+const WC = {
+  brass:'#9c9c9c', brassDim:'#4a4a4a', brassBright:'#ffffff',
+  red:'#ffffff', redBright:'#ffffff',
+  verdigris:'#ffffff',
+  panelA:'#000000', panelB:'#0d0d0d', panelInner:'#000000',
+  paper:'#ffffff', ink:'#000000',
+};
+
+function buildWheelSVG(natal){
+  const cx=400, cy=400;
+  const rOuter=384, rZodiacIn=344, rHouseOut=344, rHouseIn=118, rInner=118;
+  const ascLon = natal.angles.ASC;
+
+  function pt(lon, r){
+    const theta = (180 + (lon - ascLon)) * Math.PI/180;
+    return [cx + r*Math.cos(theta), cy - r*Math.sin(theta)];
+  }
+  function norm360(x){ x=x%360; return x<0?x+360:x; }
+
+  let svg = [];
+  svg.push(`<svg viewBox="0 0 800 800" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:640px;">`);
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter+8}" fill="${WC.panelInner}" stroke="${WC.brass}" stroke-width="1.4"/>`);
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${rOuter+4}" fill="none" stroke="${WC.brassDim}" stroke-width="0.6"/>`);
+
+  // graduated limb: fine 1deg ticks around the outer rim
+  for(let d=0; d<360; d+=1){
+    if(d%10===0) continue;
+    const big = d%5===0;
+    const [t1x,t1y] = pt(d, rOuter+4);
+    const [t2x,t2y] = pt(d, rOuter+4+(big?3.5:1.8));
+    svg.push(`<line x1="${t1x}" y1="${t1y}" x2="${t2x}" y2="${t2y}" stroke="${WC.brassDim}" stroke-width="${big?0.5:0.3}" opacity="0.8"/>`);
+  }
+
+  // zodiac wedges, flat alternating charcoal tones, no pattern
+  for(let i=0;i<12;i++){
+    const lonStart = i*30;
+    const midLon = lonStart+15;
+    const [tx,ty] = pt(midLon, (rOuter+rZodiacIn)/2 + 2);
+    const fill = i%2===0 ? WC.panelA : WC.panelB;
+    const [x1,y1]=pt(lonStart,rZodiacIn), [x2,y2]=pt(lonStart,rOuter);
+    const [x3,y3]=pt(lonStart+30,rOuter), [x4,y4]=pt(lonStart+30,rZodiacIn);
+    svg.push(`<path d="M${x1},${y1} L${x2},${y2} A${rOuter},${rOuter} 0 0,0 ${x3},${y3} L${x4},${y4} A${rZodiacIn},${rZodiacIn} 0 0,1 ${x1},${y1} Z" fill="${fill}" stroke="${WC.brassDim}" stroke-width="0.6"/>`);
+    svg.push(`<circle cx="${tx}" cy="${ty}" r="14" fill="${WC.panelInner}" stroke="${WC.brassDim}" stroke-width="0.5" opacity="0.95"/>`);
+    svg.push(`<text x="${tx}" y="${ty}" text-anchor="middle" dominant-baseline="central" font-size="19" fill="${WC.red}" font-family="serif">${WHEEL_SIGN_GLYPH[i]}</text>`);
+    for(let d=0; d<30; d+=10){
+      const [tx1,ty1]=pt(lonStart+d, rZodiacIn);
+      const [tx2,ty2]=pt(lonStart+d, rZodiacIn + (d===0?10:6));
+      svg.push(`<line x1="${tx1}" y1="${ty1}" x2="${tx2}" y2="${ty2}" stroke="${WC.brassDim}" stroke-width="${d===0?1.2:0.6}"/>`);
+    }
+  }
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${rZodiacIn}" fill="none" stroke="${WC.brass}" stroke-width="1"/>`);
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${rInner}" fill="${WC.panelInner}" stroke="${WC.brass}" stroke-width="1"/>`);
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${rInner-5}" fill="none" stroke="${WC.brassDim}" stroke-width="0.5"/>`);
+
+  // house cusps
+  const cusps = natal.houses_placidus.cusps;
+  const angleNames = {0:'AC',3:'IC',6:'DC',9:'MC'};
+  for(let i=0;i<12;i++){
+    const lon = cusps[i];
+    const isAngle = (i===0||i===3||i===6||i===9);
+    const [x1,y1] = pt(lon, rHouseIn);
+    const [x2,y2] = pt(lon, rHouseOut);
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isAngle?WC.red:WC.brassDim}" stroke-width="${isAngle?1.9:0.7}" stroke-dasharray="${isAngle?'none':'2,2'}"/>`);
+    const nextLon = cusps[(i+1)%12];
+    const midLon = norm360(lon + norm360(nextLon-lon)/2);
+    const [lx,ly] = pt(midLon, rHouseIn-16);
+    svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${WC.brassDim}" font-family="serif">${i+1}</text>`);
+    if(isAngle){
+      const [ax,ay] = pt(lon, rOuter+22);
+      svg.push(`<text x="${ax}" y="${ay}" text-anchor="middle" dominant-baseline="central" font-size="13" fill="${WC.redBright}" font-family="serif" font-weight="bold">${angleNames[i]}</text>`);
+    }
+  }
+
+  // aspect lines (within inner circle)
+  const wheelSet = new Set(WHEEL_BODIES);
+  const drawn = new Set();
+  natal.aspects.forEach(a=>{
+    if(!wheelSet.has(a.p1) || !wheelSet.has(a.p2)) return;
+    if(!['Opposition','Trine','Square','Sextile','Quincunx'].includes(a.aspect)) return;
+    const key = [a.p1,a.p2,a.aspect].sort().join('|');
+    if(drawn.has(key)) return; drawn.add(key);
+    const [x1,y1] = pt(natal.points[a.p1].lon, rInner);
+    const [x2,y2] = pt(natal.points[a.p2].lon, rInner);
+    let color = WC.brassDim, width=0.6, dash='none';
+    if(a.aspect==='Trine'||a.aspect==='Sextile'){ color=WC.paper; width=0.6; }
+    else if(a.aspect==='Square'||a.aspect==='Opposition'){ color=WC.paper; width=1.7; }
+    else { color=WC.brassDim; dash='3,3'; width=0.6; }
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-dasharray="${dash}" opacity="0.85"/>`);
+  });
+
+  // planet placement with collision avoidance
+  let pts = WHEEL_BODIES.map(name=>({name, lon: natal.points[name].lon})).sort((a,b)=>a.lon-b.lon);
+  const clusters = [];
+  let cur = [];
+  for(let i=0;i<pts.length;i++){
+    if(cur.length===0){ cur.push(pts[i]); continue; }
+    const prevLon = cur[cur.length-1].lon;
+    let diff = pts[i].lon - prevLon;
+    if(diff < 7){ cur.push(pts[i]); } else { clusters.push(cur); cur=[pts[i]]; }
+  }
+  if(cur.length) clusters.push(cur);
+  if(clusters.length>1){
+    const first=clusters[0][0], last=clusters[clusters.length-1][clusters[clusters.length-1].length-1];
+    if((first.lon+360-last.lon) < 7){ clusters[0] = clusters.pop().concat(clusters[0]); }
+  }
+  const radiiLevels = [320, 296, 272, 250];
+  clusters.forEach(cluster=>{
+    cluster.forEach((p,j)=>{
+      const r = radiiLevels[j % radiiLevels.length];
+      const [gx,gy] = pt(p.lon, r);
+      const [tx,ty] = pt(p.lon, rZodiacIn-4);
+      svg.push(`<line x1="${tx}" y1="${ty}" x2="${gx}" y2="${gy}" stroke="${WC.brassDim}" stroke-width="0.4" opacity="0.5"/>`);
+      svg.push(`<circle cx="${gx}" cy="${gy}" r="12.5" fill="${WC.panelInner}" stroke="${WC.red}" stroke-width="0.6"/>`);
+      svg.push(`<text x="${gx}" y="${gy}" text-anchor="middle" dominant-baseline="central" font-size="15" fill="${WC.paper}" font-family="serif">${WHEEL_GLYPH[p.name]}<title>${p.name}</title></text>`);
+      svg.push(`<title>${p.name}: ${natal.points[p.name].deg}\u00b0${String(natal.points[p.name].min).padStart(2,'0')}' ${natal.points[p.name].sign}</title>`);
+    });
+  });
+
+  svg.push(`</svg>`);
+  return svg.join('');
+}
+
+</script>
+<script>
+const INTERP = {
+
+overview: `The chart rules from a hidden room. Cancer rises, giving a first impression that is protective, absorbent, attuned to the emotional temperature of a room before a word is spoken. But the Ascendant's ruler, the Moon, sits peregrine in Gemini in the 12th house: the actual engine of selfhood runs in private, sorting experience into language, away from an audience. What looks like a protective persona from outside is, from inside, a front door to a self that does most of its living in solitude, on the page.
+
+The Sun, exalted in Aries and further strengthened by day-triplicity, gives real confidence and directness, but it sits in the 11th house, so identity organizes around causes, futures, and the company of the like-minded rather than one-to-one intimacy. That solar confidence is also combust, held within five degrees of a retrograde Mercury: the will and the mind move together almost involuntarily, and the retrograde Mercury means the outward voice is a revised voice, not a first draft. This is a chart built for editing, in the literal sense, before it is built for anything else.
+
+Saturn is the chart's real center of gravity: domicile in Aquarius, further strengthened by day-triplicity, the single most dignified planet here, sitting in the 8th house of shared resources and structural transformation. Mars, by contrast, is the weakest thing in the chart, in its classical Fall in Cancer, tucked into the same hidden 12th house as the Moon and Venus, though conjunct the Ascendant itself, so its usually-buried force is nonetheless the first thing registered on meeting the person. Between them, Saturn's structural authority and Mars's private intensity are the two poles this chart has to keep reconciling.
+
+The dispositor chains close on themselves twice: once in a locked loop of Mars, Moon, and Mercury (absorbing Sun, Venus, and Jupiter along with them), and once in a locked loop of Saturn and Uranus (absorbing Neptune). Pluto, dignified in its own modern sign, answers only to itself. Under the traditional rulerships Nicholas already asked about, Saturn stands alone as sole final dispositor of the outer, structural material, while Pluto folds into the instinct-feeling-thought loop instead of standing apart. Both versions agree on the essential shape: this is a chart with real autonomy at its edges and total interdependence at its emotional core.`,
+
+placements: {
+  'Sun': `Exalted in Aries and further dignified by day-triplicity, this is a genuinely confident placement, the will acting before it deliberates. Set in the 11th house, that confidence isn't staged for a lover or a family; it organizes around groups, causes, and shared futures, identity built through what gets made with others rather than through domestic mirroring. The Sun is also combust, sitting under five degrees from Mercury: thinking and self-assertion arrive fused, with no clean separation between "just having an idea" and "being seen to have it." Since that Mercury is retrograde, the fusion comes pre-edited. Confidence here has already been revised before it goes public.`,
+
+  'Moon': `The Moon rules the Ascendant, so the whole chart answers to what it's doing, and what it's doing is running peregrine, with no essential dignity, in Gemini, in the 12th house. Peregrine doesn't mean weak. It means unanchored, taking its cues from context and aspect rather than an inborn home-court advantage. Gemini asks the emotional instrument to metabolize feeling by naming it, sorting experience through language rather than simply sitting inside it. The 12th house is where this happens, not in company but alone, through writing, through institutional or solitary work that doesn't require being watched doing it. Because this Moon also rules the rising sign, the entire outward persona, protective and attuned as Cancer makes it look, is really a door onto a self built in private.`,
+
+  'Mercury': `Retrograde at birth, and combust, sitting under five degrees from the Sun. This is a real signature, not a passing transit: a mind that reviews before it transmits. Aries wants the blunt, immediate, first-instinct sentence; retrograde and combustion both intercept that impulse, producing someone who often knows the sharper version of a line and deliberately withholds it, revising toward precision instead of speed. The house is the 10th, meaning this isn't a private tic, it's the actual professional instrument. Editing, in the strict sense, is what a retrograde, combust Mercury in Aries in the house of vocation is built to do well.`,
+
+  'Venus': `Peregrine in Gemini, in the 12th house, and conjunct the Moon almost exactly. Affection and lunar need aren't separate functions here, they're nearly one signal. Gemini Venus loves through conversation and curiosity about a person rather than static devotion; the 12th keeps most of that expression unspoken, care given quietly, aesthetic pleasure taken without an audience. The tight Moon conjunction means what makes this person feel safe and what makes them fall for someone are, in practice, close to indistinguishable.`,
+
+  'Mars': `In its classical Fall here, Cancer being the sign directly opposite Mars's exaltation in Capricorn. This is the single most afflicted placement in the chart by essential dignity, and Cancer specifically asks assertion to go indirect: anger becomes withdrawal, hurt, or pre-emptive protection rather than confrontation. The 12th house compounds it, force operating below the threshold of conscious display until it surfaces as exhaustion or crisis rather than a clean fight. And yet this same Mars sits almost exactly on the Ascendant. The force that feels buried and indirect from the inside is often the very first thing another person registers on meeting you.`,
+
+  'Jupiter': `Peregrine in Leo, warm and inclined toward generosity and creative confidence without any inherent dignity backing it up. Set in the 2nd house, that expansiveness attaches to money and self-worth directly: a belief that abundance is available and that talent has real market value. The wide square from the Sun is worth naming honestly, since confidence here can outrun what current resources actually support. Not a flaw to correct so much as a tendency to check against the ledger occasionally.`,
+
+  'Saturn': `Domicile in Aquarius and, this being a day chart, also holding day-triplicity rulership of Air. This is the most dignified planet in the entire chart, structurally at home in exactly the way Aquarius wants: systems, principle, long-range architecture, discipline that is impersonal rather than sentimental. The 8th house is where it operates, other people's resources, shared structures, inheritance, what gets transformed rather than simply held. A Saturn this strong here indicates real, earned authority over what is buried or joint, someone trusted with stakes that aren't only their own. Its near-exact sextile to Black Moon Lilith is a genuine asset: the wildest, least tameable part of the self and the most disciplined part of the self are in active cooperation rather than at war.`,
+
+  'Uranus': `In Capricorn, a generational placement shared by the whole cohort, individuating through slow, structural rebellion rather than sudden rupture for its own sake: dismantling and rebuilding outmoded forms rather than simply breaking them. Set in the 7th house, that current runs specifically through partnership, relationships that arrive suddenly, ask for unconventional terms, or periodically demand real independence within commitment. Conjunct the fixed star Vega, encounters with significant others carry a genuinely magnetic, almost hypnotic charge, charisma that can appear outsized and arrive without warning.`,
+
+  'Neptune': `Also in Capricorn in the 7th, close enough to Uranus to share its house and sign context. Neptune's specific signature is idealization, a haze over partnership and open commitment, the tendency to see a partner as more than, or other than, what they actually are, especially early on. Worth stating plainly since it's the most common site of disappointment for this placement: not a character flaw, a structural feature, best handled by building in time and evidence before commitment rather than distrusting the pull itself.`,
+
+  'Pluto': `Domicile by modern rulership in Scorpio, meaning its intensity here is concentrated and largely unfiltered. Set in the 5th house of creativity, romance, and self-expression, that concentrated charge doesn't stay backgrounded, it shows up directly in what gets made and who gets loved: creative work with real stakes, romantic involvement that is rarely casual. Its near-exact conjunction to the fixed star Zuben Eschamali, traditionally associated with fortune and vindication, adds an unusual thread to Pluto's normal all-or-nothing character: intensity that tends, over time, toward being proven right rather than merely feared.`,
+
+  'Chiron': `Sitting almost exactly at the degree of the Gemini twins, conjunct both Castor, traditionally Mercury-natured, and Pollux, traditionally Mars-natured. In the 1st house in Cancer, the original wound is bound up with a felt duality present from the start: quickness and articulateness on one side, exposure to force or conflict on the other, the two not well integrated at the time of the injury. The near-exact trine to the Midheaven is one of the tightest contacts in the whole chart: the wound is wired directly into vocation. Helping others work with exactly this split, mind against force, articulateness against exposure, isn't incidental to the career this chart supports. It's close to the career's actual raw material.`,
+
+  'North Node': `The growth axis runs from Cancer to Capricorn, 1st house to 7th. The default, comfortable mode (Cancer, South Node) is self-protection and a private, self-referencing identity; the direction of growth (Capricorn, North Node, in the 7th, ruled by the chart's most dignified planet) is public accountability and structural achievement built through real partnership with an equal, not a projection. The South Node's near-exact conjunction to the martial fixed star Pollux suggests the well-worn default often dresses defensive readiness up as protection. The way through isn't to abandon depth, it's to route it outward into structures and partnerships built to hold it.`,
+
+  'South Node': `See North Node. The comfortable, over-used pattern: Cancer in the 1st, a self built around emotional self-protection, family-of-origin habits, and withdrawal presented as care. Its exact conjunction to the fixed star Pollux, traditionally martial, suggests this default carries more readiness for conflict than its gentle Cancerian surface lets on.`,
+
+  'Black Moon Lilith': `In Sagittarius in the 6th house, conjunct the fixed star Al Niyat, part of the intense, transformative Scorpio-adjacent star cluster near Antares. The untamed, unintegrated instinct here insists on its own beliefs and refuses to perform discipline for its own sake, specifically in the domain of daily work and routine. Its exact opposition to the Moon is structural: the part of the self that wants to stay wild and the part that wants quiet emotional safety are natally opposed, not a problem to solve once but a tension to keep actively reconciling. Its exact sextile to Saturn is the resource: this wildness, when it needs to, can borrow real discipline rather than dissipating.`,
+
+  'Ascendant': `Cancer rising presents first as attuned and protective, someone who reads a room's emotional temperature before speaking into it. Its ruler, the Moon, sits hidden in the 12th house (see Moon), meaning the persona is genuine, not a mask, but it is a threshold onto a self that does most of its actual living somewhere far more private.`,
+
+  'Midheaven': `Pisces at the Midheaven makes for a vocation that's porous and translative: work that takes something intangible, belief, feeling, the symbolic weight of history, and makes it legible to other people. Chiron's near-exact trine to this point is the chart's single clearest statement about vocation: the wound described under Chiron isn't separate from the work. It is close to being the work's actual material.`,
+
+  'Ceres': `Retrograde in Libra, in the 5th (Placidus) or 4th (whole-sign) house. Nurturance here is relational and aesthetic rather than purely instinctive, care expressed through balance, fairness, and the deliberate shaping of a beautiful or well-ordered environment, extended toward creative work and home alike.`,
+
+  'Pallas': `Retrograde in Virgo in the 3rd house. A strategic intelligence built for close analysis and precise communication, pattern-recognition applied at the level of the sentence and the argument, consistent with, and reinforcing, the editing instinct already visible in Mercury.`,
+
+  'Juno': `In Capricorn in the 7th house, close to the North Node. Committed partnership is approached seriously here, wanting a peer who can meet real structural expectations, not a romantic ideal but a working equal.`,
+
+  'Vesta': `In Gemini in the 12th house, alongside Venus and the Moon. Devotion here is intellectual and largely private: what gets tended with real discipline is the inner life of language and thought, work done in solitude rather than in front of others.`,
+},
+
+dignitySynthesis: `Only two of the seven traditional planets carry any essential dignity, and they sit at opposite ends of the scale. Saturn is domicile and day-triplicity ruler in Aquarius, the strongest thing in the chart by a wide margin, giving real structural authority in the 8th house. The Sun is exalted and day-triplicity ruler in Aries, strong but combust, its confidence pre-filtered through a retrograde Mercury before it goes public. Mars sits at the other extreme, in its classical Fall in Cancer, the chart's most afflicted placement, its force buried in the 12th house even while it sits conjunct the Ascendant itself. Moon, Mercury, Venus, and Jupiter are all peregrine: none carry inherent dignity, so each takes its character almost entirely from house, aspect, and sign rather than an inborn strength. Practically, this describes a personality with two genuinely reliable anchors, disciplined structural competence and confident, if pre-edited, self-assertion, and a wide middle ground (mind, love, luck, feeling) that has to be actively built rather than assumed.`,
+
+dispositors: {
+  modern: `Two closed loops and one lone terminus. Mars, Moon, and Mercury dispose of each other in a locked three-way circuit, with the Sun, Venus, and Jupiter all feeding into it, meaning instinct, feeling, and thought answer only to each other, not to anything steadier. Saturn and Uranus form a second closed loop, with Neptune feeding in: structure and rupture locked in permanent, productive argument rather than one ever fully winning. Pluto disposits only itself, dignified and autonomous, answering to nothing else in the chart. The reactive, verbal, feeling-driven engine runs the show for most of the personality; transformation runs entirely on its own authority.`,
+  traditional: `Collapsing to the older rulerships changes the shape. Saturn becomes sole final dispositor of itself, Uranus, and Neptune, meaning structure genuinely wins that argument rather than fighting Uranus to a draw; the outer, transpersonal material answers to Saturnian discipline in the end. Pluto stops standing alone and folds into the Mars-Moon-Mercury loop, its ruler under this system, meaning transformation happens through instinct, feeling, and thought rather than as an isolated, self-authorizing force. The traditional read is more integrated: two centers of gravity instead of three, and one clean hierarchy where structure has the final word.`,
+},
+
+fixedStars: {
+  'Uranus|Vega': `Vega is one of the sky's brightest stars, traditionally linked to artistic gift, charisma, and a hypnotic, almost seductive quality of influence. Conjunct Uranus in the 7th, it charges encounters with significant others with a magnetic, sudden pull, the kind of charisma that can feel outsized on arrival.`,
+  'Chiron|Pollux': `Pollux carries a traditionally Mars-natured character: combativeness, physical assertion, sometimes rashness. Sitting on Chiron in the 1st house, it ties the original wound to exposure, to force or conflict met before the self had the resources to meet it well.`,
+  'South Node|Pollux': `The same martial star sits exactly on the South Node. The well-worn, default pattern (Cancer in the 1st, self-protection presented as gentleness) carries more combative readiness under the surface than its soft Cancerian coloring suggests.`,
+  'Chiron|Castor': `Castor is traditionally Mercury-natured: quick, verbal, cerebral. Conjunct Chiron alongside its twin Pollux, it places the wound exactly between the two poles the twins represent, a mind fast enough to see everything and a body once exposed to more force than that quickness could counter.`,
+  'Black Moon Lilith|Alniyat': `Al Niyat sits in the intense, transformative star cluster near Antares, the heart of Scorpio. Conjunct Lilith in the 6th house, it deepens the untamed instinct's expression in daily work and routine, adding a penetrating, hard-to-categorize quality that resists domestication specifically in that domain.`,
+  'Pluto|Zuben Eschamali': `Zuben Eschamali, "the Northern Claw," carries a traditionally fortunate, justice-adjacent character. Sitting almost exactly on Pluto in the 5th house, it is a genuinely rare, tight contact: Pluto's usual all-or-nothing intensity paired with a thread of eventual vindication, power in creative and romantic matters that tends, over time, to be proven right rather than simply feared.`,
+},
+
+arabicParts: {
+  'Part of Fortune': `In Leo in the 2nd house. Material and bodily wellbeing here track visible self-expression and creative confidence rather than hidden means; fortune favors being seen doing the thing well, not staying quiet about it.`,
+  'Part of Spirit': `In Taurus in the 11th house. The active will operates through patient, grounded, sustained effort aimed at long-term or collective goals, not quick individual moves. Persistence, not speed, is the native strategy.`,
+  'Part of Eros': `In Cancer in the 1st house, close to the Ascendant itself. Erotic and passionate drive is bound up with self-image and emotional exposure; being desired and being emotionally legible to another person are close to the same experience here.`,
+  'Part of Necessity': `In Scorpio in the 5th house. What feels unavoidable or required attaches to creative self-expression, and Scorpio gives it a compulsive, high-stakes character: creative output that doesn't feel optional once it's underway.`,
+  'Part of Courage': `In Taurus in the 11th house, alongside the Part of Spirit. Courage here looks like steady persistence toward long-range or communal goals rather than a single dramatic act.`,
+  'Part of Victory': `In Virgo in the 3rd house. Success tracks precise communication, editing, and analysis directly, a striking match with the actual profession, and with Mercury and Pallas both pointing the same direction.`,
+  'Part of Nemesis': `In Sagittarius in the 6th house. The point of greatest vulnerability is overextension in belief or meaning-seeking, showing up specifically in the domain of work and daily routine rather than as an abstract philosophical risk.`,
+  'Part of Marriage': `In Scorpio in the 5th house. Commitment is approached with real intensity and stakes, not lightly, and its placement in the house of romance and creative self-expression ties partnership closely to what gets made and performed, not kept separate from it.`,
+},
+
+harmonics: {
+  '5': `The 5th harmonic, astrology's traditional register for talent and craft, lights up around the Midheaven and the Ascendant-Mars axis: Chiron trine Midheaven, the Sun opposite Midheaven, Mars conjunct Ascendant, Uranus square Pluto. Talent here isn't decorative, it is built directly out of the wound (Chiron), asserted forcefully on contact (Mars-Ascendant), and tested against real structural pressure (Uranus-Pluto). This is a harmonic that rewards making the difficult material itself into the craft, rather than smoothing it out before it reaches the page.`,
+  '7': `The 7th harmonic, tied to inspiration, imagination, and forms of dissolution, produces the single tightest aspect anywhere in this analysis: Neptune exactly trine the Ascendant. Imagination isn't a separate faculty layered onto the personality here, it's built into first impression itself. The Sun sextile the nodal axis and Mars trine Neptune reinforce it: inspired, image-driven thinking is a genuine, well-supported talent, not an occasional visitor.`,
+  '9': `The 9th harmonic, associated with completion and belief, clusters heavily around the angles and the wounded-healer material again: Saturn trine and sextile the nodal axis, Chiron trine the Ascendant and conjunct the Midheaven, the Ascendant itself trine the Midheaven. Belief, in this chart, completes itself through vocation and public identity rather than private conviction alone. Whatever gets resolved here tends to resolve in the world, visibly, rather than staying internal.`,
+},
+
+aspects: {
+  'Black Moon Lilith|Saturn|Sextile': `The chart's most dignified planet and its wildest point cooperate easily. Discipline doesn't suppress the untamed instinct, it gives it a container sturdy enough to actually act from.`,
+  'Chiron|Midheaven|Trine': `The original wound wires almost directly into public vocation. What was once injury becomes, without much forcing, recognizable authority in the working world.`,
+  'Ascendant|Mars|Conjunction': `Mars in its Fall is nonetheless the very first thing that registers on meeting this person, intensity felt on arrival even though its owner may experience that same force as buried or indirect. What reads as presence from outside can feel, from inside, like something held back.`,
+  'Black Moon Lilith|Moon|Opposition': `The need for emotional safety and the refusal to be tamed sit at genuine odds. Choosing security can feel like betraying the wild self; choosing wildness can feel unsafe. Both are true, and the tension is structural, not a problem to solve once and be done with.`,
+  'Moon|Saturn|Trine': `Emotional need and the capacity for structure are natural allies. Feelings, however privately held, can be organized and trusted to bear real weight rather than dissolve under pressure.`,
+  'Mercury|North Node|Square': `The habitual, well-worn way of thinking sits at odds with the direction of growth. Old patterns of speaking too fast, or not at all, get tested directly against the discipline the North Node is asking for.`,
+  'Saturn|Venus|Trine': `Affection, once given, tends to last. This placement supports long-term loyalty even though Venus itself would rather stay light and private; Saturn's steadying influence is a genuine asset to romantic continuity.`,
+  'Chiron|Mercury|Square': `The mind and the old wound are in active friction. Words can reopen the injury even without intending to, and precise, edited language is likely both the site of the wound and its most effective treatment.`,
+  'Black Moon Lilith|Venus|Opposition': `What is loved and what refuses domestication pull in opposite directions. Attraction to what can't be tamed is native here, and so is the difficulty reconciling that pull with Venus's own preference for lightness.`,
+  'Moon|Venus|Conjunction': `Emotional need and romantic affection are nearly a single signal. What makes this person feel safe and what makes them fall for someone are, in practice, close to indistinguishable.`,
+  'Chiron|North Node|Opposition': `The old wound sits almost exactly on the nodal axis. Healing and growth aren't separate projects here; moving toward the North Node's material is, structurally, the same motion as working with the wound itself.`,
+  'Midheaven|North Node|Sextile': `The chart's developmental axis connects easily to vocation. Public work is a legitimate, structurally supported venue for the growth process, not a distraction from it.`,
+  'Jupiter|Venus|Sextile': `A genuine talent for pleasure, generosity, and social warmth, available easily and without much internal conflict.`,
+  'Midheaven|Pluto|Trine': `Concentrated, undiluted intensity finds an easy public outlet. Authority accrues less through visibility than through the sense, in others, that this person has actually been somewhere most people haven't.`,
+  'Chiron|Pluto|Trine': `The concentrated intensity and the original wound are allies rather than adversaries. Depth of feeling, even at its most extreme, tends to serve the healing process here rather than derail it.`,
+  'Jupiter|Saturn|Opposition': `The classical tension between expansion and limitation. Confidence in resources meets the reality-testing of the chart's most dignified planet; the correction reads as a built-in audit, not a genuine threat.`,
+  'Black Moon Lilith|Jupiter|Trine': `Confidence and the untamed instinct cooperate. Self-worth doesn't require suppressing what's wild or unconventional, if anything the wildness is a legitimate source of it.`,
+  'Jupiter|Moon|Sextile': `Emotional life runs fundamentally optimistic and generously proportioned, even given its private, 12th-house expression.`,
+  'Neptune|Pluto|Sextile': `A generational current, shared by the whole cohort, but present here as background compatibility between the idealizing register and the concentrated, transformative one. Imagination and depth aren't at war.`,
+  'North Node|Pluto|Sextile': `Growth is supported, not opposed, by Pluto's concentrated intensity. The developmental work of this lifetime can draw on real depth rather than needing to avoid it.`,
+  'North Node|Sun|Square': `Core identity sits in active tension with the growth direction. Solar confidence built around groups and causes has to be actively reconciled with the North Node's more solitary, structural discipline; the two don't automatically agree.`,
+  'Midheaven|Neptune|Sextile': `Vocation carries a real imaginative charge, consistent with, and reinforcing, the Piscean Midheaven itself.`,
+  'Chiron|Neptune|Opposition': `Idealization and the original wound are in tension. The tendency to dissolve hard edges can obscure the wound rather than heal it if left unchecked; clarity has to be actively chosen over comfortable haze.`,
+  'Mercury|Sun|Conjunction': `Thinking and self-assertion arrive fused, with the Sun's confidence largely dependent on Mercury's approval before it goes public. Combust at this orb, in classical terms, means the mind's own light is absorbed into the will's, not extinguished by it.`,
+  'Mercury|Neptune|Square': `Thinking and idealization pull against each other. Precision, this chart's real gift once past the retrograde editing process, can blur under Neptune's influence, exactly the kind of soft error a scrupulous editor wouldn't expect from themselves.`,
+  'Chiron|Sun|Square': `Core identity and the original wound are in active friction. Solar confidence and the old injury don't fully coexist without effort; the wound can undercut assurance episodically even when the rest of the chart argues it shouldn't.`,
+  'Ascendant|Uranus|Opposition': `A need for independence meets the self as presented to others directly. Partnership (Uranus in the 7th) periodically requires a kind of freedom that can look, from the outside, like sudden distance.`,
+  'Mars|Uranus|Opposition': `Already-indirect force meets a need for sudden independence, especially in partnership. Assertion can arrive as an unexpected break rather than a steady confrontation.`,
+  'Neptune|North Node|Conjunction': `Growth is colored by idealism, sometimes romanticizing the very structures the North Node is asking to be built. Worth watching so the discipline being developed doesn't stay purely conceptual.`,
+  'Jupiter|Sun|Square': `Confidence can outrun what current means actually support. Not a flaw so much as a tendency worth checking against the ledger now and then.`,
+},
+
+};
+
+if(typeof module !== 'undefined') module.exports = INTERP;
+if(typeof window !== 'undefined') window.INTERP = INTERP;
+
+</script>
+<script>
+let AD, NATAL;
+const rendered = {};
+
+function $(sel, root){ return (root||document).querySelector(sel); }
+function el(tag, attrs, children){
+  const e = document.createElement(tag);
+  if(attrs) for(const k in attrs){ if(k==='html') e.innerHTML=attrs[k]; else if(k==='text') e.textContent=attrs[k]; else e.setAttribute(k,attrs[k]); }
+  (children||[]).forEach(c=>e.appendChild(c));
+  return e;
+}
+function fmtPos(p){ return `${p.deg}\u00b0${String(p.min).padStart(2,'0')}' ${p.sign}`; }
+
+// ---------- INTERPRETATION LOOKUP ----------
+function aspectKey(p1,p2,aspect){ return [p1,p2].sort().join('|')+'|'+aspect; }
+function findAspectInterp(p1,p2,aspect){
+  const flip = {Conjunction:'Opposition', Opposition:'Conjunction', Square:'Square', Trine:'Sextile', Sextile:'Trine'};
+  const swapNode = n => n==='North Node'?'South Node':(n==='South Node'?'North Node':n);
+  const swapAngle = n => n==='Ascendant'?'Descendant':(n==='Descendant'?'Ascendant':n);
+  const pointVariants = [[p1,p2],[swapNode(p1),swapNode(p2)],[swapAngle(p1),swapAngle(p2)],[swapNode(swapAngle(p1)),swapNode(swapAngle(p2))]];
+  const aspectVariants = [aspect, flip[aspect]||aspect];
+  for(const [a,b] of pointVariants){
+    for(const asp of aspectVariants){
+      const hit = INTERP.aspects[aspectKey(a,b,asp)];
+      if(hit) return hit;
+    }
+  }
+  return null;
+}
+function collectKeyAspects(){
+  const seen = new Map();
+  NATAL.aspects.forEach(a=>{
+    const interp = findAspectInterp(a.p1,a.p2,a.aspect);
+    if(!interp) return;
+    if(!seen.has(interp) || a.orb < seen.get(interp).orb){
+      seen.set(interp, {orb:a.orb, p1:a.p1, p2:a.p2, aspect:a.aspect, interp});
+    }
+  });
+  return [...seen.values()].sort((x,y)=>x.orb-y.orb);
+}
+function readingP(text){ return el('p',{class:'reading', html:annotateTerms(text)}); }
+function ledeP(text, extraStyle){ return el('p',{class:'lede', style:extraStyle||'', html:annotateTerms(text)}); }
+function divider(){ return el('div',{class:'divider'},[el('div',{class:'line'}), el('div',{class:'orn'}), el('div',{class:'line'})]); }
+
+// ---------- GLOSSARY / HOVER DEFINITIONS ----------
+const GLOSSARY = {
+  'Ascendant': 'The zodiac degree rising on the eastern horizon at birth. Sets the first house and the outward manner.',
+  'Midheaven': 'The degree culminating at the top of the chart. Governs vocation and public reputation.',
+  'Descendant': 'The point directly opposite the Ascendant. Governs partnership and open relationship.',
+  'Imum Coeli': 'The point opposite the Midheaven, at the base of the chart. Governs home and psychological foundation.',
+  'Vertex': 'A sensitive point on the western side of the chart, sometimes read as a marker of fated encounter.',
+  'North Node': 'One end of the axis traced by the Moon\u2019s orbit crossing the ecliptic. Marks the direction of growth.',
+  'South Node': 'The other end of the lunar node axis. Marks default, well-practiced habit.',
+  'Black Moon Lilith': 'The Moon\u2019s empty focus point, a geometric point rather than a body. Read as untamed, unintegrated instinct.',
+  'Chiron': 'A small body orbiting between Saturn and Uranus. Read as the wound that becomes a teaching.',
+  'retrograde': 'Apparent backward motion of a body as seen from Earth. Traditionally read as delay, internalization, or revision.',
+  'combust': 'Within about eight degrees of the Sun. The body\u2019s own light is considered obscured, harder to access cleanly.',
+  'domicile': 'A planet in the sign it rules. Its strongest, most essential dignity.',
+  'exaltation': 'A sign in which a planet operates with unusual ease and honor, second only to domicile.',
+  'detriment': 'A planet in the sign opposite its own rulership. A position of essential weakness.',
+  'triplicity': 'The rulership of an element, fire, earth, air, or water, assigned by day or night sect.',
+  'peregrine': 'A planet with no essential dignity at all. Its expression depends entirely on aspect and house.',
+  'sect': 'Whether a chart is diurnal, Sun above the horizon, or nocturnal. Determines which planets are favored.',
+  'dispositor': 'The ruler of the sign a planet occupies. Tracing dispositors shows what ultimately governs what.',
+  'Placidus': 'A house system dividing the chart by time, the most widely used in modern practice.',
+  'whole-sign': 'The oldest known house system: each sign is simply one house, starting from the Ascendant\u2019s sign.',
+  'essential dignity': 'A planet\u2019s inherent strength or weakness by sign placement alone, independent of aspect.',
+  'fixed star': 'A star beyond the solar system, given fixed zodiacal degrees and traditional meaning by ancient astrologers.',
+  'harmonic': 'A chart derived by multiplying every longitude by a whole number, revealing a different layer of the same birth moment.',
+  'solar arc': 'A predictive technique that advances every natal point by the same arc the progressed Sun has travelled.',
+  'progressed': 'Moved forward by secondary progression, where one day after birth stands for one year of life.',
+  'progressions': 'The secondary-progression technique: one day after birth stands for one year of life.',
+  'quincunx': 'A 150\u00b0 aspect between bodies in signs that share nothing in common. Read as an awkward adjustment.',
+  'cazimi': 'A planet within about 17 arcminutes of the Sun, considered empowered rather than obscured.',
+  'combustion': 'The state of being combust: too close to the Sun for a planet\u2019s own light to show clearly.',
+  'Part of Fortune': 'The classical lot of the body and material circumstance, derived from Sun, Moon, and Ascendant by sect.',
+  'Part of Spirit': 'The classical lot of the active will and intention, the mirror of the Part of Fortune.',
+  'Part of Eros': 'A Hermetic lot of desire and passionate love.',
+  'Part of Necessity': 'A Hermetic lot of what is compelled or unavoidable.',
+  'Part of Courage': 'A Hermetic lot of boldness and the capacity to act.',
+  'Part of Victory': 'A Hermetic lot of success and the fulfillment of desire.',
+  'Part of Nemesis': 'A Hermetic lot of vulnerability and reversal.',
+  'Part of Marriage': 'A classical lot of committed partnership.',
+};
+const GLOSSARY_LOWER = {};
+Object.keys(GLOSSARY).forEach(k=>{ GLOSSARY_LOWER[k.toLowerCase()] = GLOSSARY[k]; });
+const GLOSSARY_KEYS_SORTED = Object.keys(GLOSSARY).sort((a,b)=>b.length-a.length);
+function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\UI_JS'); }
+const GLOSSARY_REGEX = new RegExp('\\b(' + GLOSSARY_KEYS_SORTED.map(escapeRegex).join('|') + ')\\b', 'gi');
+function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function annotateTerms(text){
+  const escaped = escapeHtml(text);
+  return escaped.replace(GLOSSARY_REGEX, (m)=>{
+    const def = GLOSSARY_LOWER[m.toLowerCase()];
+    if(!def) return m;
+    return `<span class="term" tabindex="0">${m}<span class="term-tip">${escapeHtml(def)}</span></span>`;
+  });
+}
+
+// ---------- OVERVIEW ----------
+function renderOverview(container){
+  const N = NATAL;
+  const sun = N.points['Sun'], moon = N.points['Moon'], asc = N.points['Ascendant'];
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'De Caelo: Nicholas J. Korody'}));
+  wrap.appendChild(el('h2',{class:'section-title', text: N.birth.place + ', ' + N.birth.month+'/'+N.birth.day+'/'+N.birth.year + ', ' + N.birth.hour+':'+String(N.birth.minute).padStart(2,'0')}));
+  wrap.appendChild(ledeP(`${N.sect.light} above the horizon in the ${N.sect.sun_house}${ordSuf(N.sect.sun_house)} house: a ${N.sect.is_day?'day':'night'} chart.`));
+
+  const bt = el('div',{class:'card'});
+  bt.appendChild(el('div',{class:'card-title', text:'The Big Three'}));
+  const row = el('div',{class:'bigthree'});
+  [['Sun',sun],['Moon',moon],['Ascendant',asc]].forEach(([label,p])=>{
+    const item = el('div',{class:'item'});
+    item.appendChild(el('div',{class:'glyph-big', text:p.glyph?TXT(p.glyph):'\u2191'}));
+    item.appendChild(el('div',{class:'label', text:label}));
+    item.appendChild(el('div',{class:'value', text: fmtPos(p) + (label!=='Ascendant' ? ` \u00b7 house ${p.house_placidus}` : '')}));
+    row.appendChild(item);
+  });
+  bt.appendChild(row);
+  wrap.appendChild(bt);
+
+  const grid = el('div',{class:'grid grid-2'});
+
+  const chartRuler = el('div',{class:'card'});
+  chartRuler.appendChild(el('div',{class:'card-title', text:'Chart Ruler & Sect'}));
+  chartRuler.appendChild(el('p',{class:'lede', style:'margin-bottom:6px', html:
+    `Ascendant in <b>${N.chart_ruler.asc_sign}</b>, ruled by <b>${N.chart_ruler.modern}</b>` +
+    (N.chart_ruler.modern!==N.chart_ruler.traditional ? ` (traditional: ${N.chart_ruler.traditional})` : '') + `.<br>` +
+    `Sect light: <b>${N.sect.light}</b>. The ${N.sect.is_day?'diurnal':'nocturnal'} sect governs which planets are dignified by triplicity.`
+  }));
+  grid.appendChild(chartRuler);
+
+  const balCard = el('div',{class:'card'});
+  balCard.appendChild(el('div',{class:'card-title', text:'Element & Modality Balance'}));
+  const elems = N.balance.elements, mods = N.balance.modalities;
+  const maxE = Math.max(...Object.values(elems)), maxM = Math.max(...Object.values(mods));
+  Object.keys(elems).forEach(k=>{
+    const r = el('div',{class:'bar-row'});
+    r.appendChild(el('div',{class:'label', text:k}));
+    const track = el('div',{class:'bar-track'});
+    track.appendChild(el('div',{class:'bar-fill', style:`width:${(elems[k]/maxE*100)}%`}));
+    r.appendChild(track);
+    r.appendChild(el('div',{class:'count', text:elems[k]}));
+    balCard.appendChild(r);
+  });
+  balCard.appendChild(el('div',{style:'height:8px'}));
+  Object.keys(mods).forEach(k=>{
+    const r = el('div',{class:'bar-row'});
+    r.appendChild(el('div',{class:'label', text:k}));
+    const track = el('div',{class:'bar-track'});
+    track.appendChild(el('div',{class:'bar-fill', style:`width:${(mods[k]/maxM*100)}%; background:var(--verdigris)`}));
+    r.appendChild(track);
+    r.appendChild(el('div',{class:'count', text:mods[k]}));
+    balCard.appendChild(r);
+  });
+  grid.appendChild(balCard);
+  wrap.appendChild(grid);
+
+  wrap.appendChild(divider());
+
+  const highlights = el('div',{class:'card'});
+  highlights.appendChild(el('div',{class:'card-title', text:'The Reading'}));
+  INTERP.overview.split('\n\n').forEach(para=>highlights.appendChild(readingP(para)));
+  wrap.appendChild(highlights);
+
+  container.appendChild(wrap);
+}
+function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
+
+// ---------- WHEEL ----------
+function renderWheelPanel(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'The Wheel'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Natal Chart'}));
+  wrap.appendChild(ledeP('Placidus houses. Ascendant fixed at the left. Red lines mark the four angles; dashed grey lines mark intermediate house cusps. Verdigris lines are soft aspects, red lines are hard aspects, dotted grey lines are quincunxes.'));
+  const ww = el('div',{class:'wheel-wrap', html: buildWheelSVG(NATAL)});
+  wrap.appendChild(ww);
+  const legend = el('div',{class:'card'});
+  legend.appendChild(el('div',{class:'card-title', text:'Glyph Key'}));
+  const g = el('div',{class:'grid grid-4', style:'font-family:var(--mono); font-size:12px;'});
+  WHEEL_BODIES.forEach(name=>{
+    g.appendChild(el('div',{text:`${WHEEL_GLYPH[name]}  ${name}`}));
+  });
+  legend.appendChild(g);
+  wrap.appendChild(legend);
+  container.appendChild(wrap);
+}
+
+// ---------- PLACEMENTS ----------
+function renderPlacements(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'All Points'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Placements'}));
+  wrap.appendChild(ledeP('Every body and point, Placidus and whole-sign house, retrograde status, and daily motion.'));
+  const table = el('table');
+  const thead = el('thead');
+  thead.appendChild(el('tr',{},['','Point','Position','House (P)','House (W)','Speed \u00b0/day'].map(h=>el('th',{text:h}))));
+  table.appendChild(thead);
+  const tbody = el('tbody');
+  const order = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Chiron','Ceres','Pallas','Juno','Vesta','North Node','South Node','Black Moon Lilith','Ascendant','Midheaven','Descendant','Imum Coeli','Vertex'];
+  order.forEach(name=>{
+    const p = NATAL.points[name];
+    if(!p) return;
+    const tr = el('tr');
+    tr.appendChild(el('td',{class:'glyph', text:p.glyph?TXT(p.glyph):''}));
+    tr.appendChild(el('td',{text:name}));
+    tr.appendChild(el('td',{class:'num', text:fmtPos(p) + (p.retrograde?' R':'')}));
+    tr.appendChild(el('td',{class:'num', text:p.house_placidus||'\u2014'}));
+    tr.appendChild(el('td',{class:'num', text:p.house_whole_sign||'\u2014'}));
+    tr.appendChild(el('td',{class:'num', text: p.speed!==null && p.speed!==undefined ? p.speed.toFixed(4) : '\u2014'}));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
+  order.forEach(name=>{
+    const p = NATAL.points[name];
+    const text = INTERP.placements[name];
+    if(!p || !text) return;
+    const card = el('div',{class:'reading-card'});
+    card.appendChild(el('div',{class:'rc-head', text:`${p.glyph?TXT(p.glyph):''}  ${name}  \u00b7  ${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}`}));
+    card.appendChild(readingP(text));
+    wrap.appendChild(card);
+  });
+  container.appendChild(wrap);
+}
+
+// ---------- ASPECTS ----------
+function renderAspectsPanel(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Natal Geometry'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Aspects'}));
+  wrap.appendChild(ledeP(`${NATAL.aspects.length} aspects among all bodies, angles, and points. The tightest and most significant are read out below; the full table follows.`));
+
+  const keyAspects = collectKeyAspects();
+  wrap.appendChild(el('div',{class:'card-title', text:'Key Aspects'}));
+  keyAspects.forEach(a=>{
+    const card = el('div',{class:'reading-card'});
+    card.appendChild(el('div',{class:'rc-head', html:`${a.p1} ${a.aspect} ${a.p2}  <span class="orb">orb ${a.orb.toFixed(2)}\u00b0</span>`}));
+    card.appendChild(readingP(a.interp));
+    wrap.appendChild(card);
+  });
+
+  wrap.appendChild(divider());
+  const details = el('details',{class:'more'});
+  details.appendChild(el('summary',{text:'Full Aspect Table (all '+NATAL.aspects.length+')'}));
+  const table = el('table');
+  const thead = el('thead');
+  thead.appendChild(el('tr',{},['Point','Aspect','Point','Orb','Nature'].map(h=>el('th',{text:h}))));
+  table.appendChild(thead);
+  const tbody = el('tbody');
+  [...NATAL.aspects].sort((a,b)=>a.orb-b.orb).forEach(a=>{
+    const tr = el('tr');
+    tr.appendChild(el('td',{text:a.p1}));
+    tr.appendChild(el('td',{text:a.aspect}));
+    tr.appendChild(el('td',{text:a.p2}));
+    tr.appendChild(el('td',{class:'num', text:a.orb.toFixed(2)+'\u00b0'}));
+    tr.appendChild(el('td',{html:`<span class="pill ${a.nature}">${a.nature}</span>`}));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  details.appendChild(table);
+  wrap.appendChild(details);
+  container.appendChild(wrap);
+}
+
+// ---------- DIGNITIES ----------
+function renderDignities(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Traditional Craft'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Essential Dignities'}));
+  wrap.appendChild(ledeP('Domicile +5, exaltation +4, triplicity +3 (by sect), term +2, face +1. Detriment \u22125, fall \u22124. The seven traditional planets only.'));
+  const synCard = el('div',{class:'card'});
+  synCard.appendChild(el('div',{class:'card-title', text:'Reading'}));
+  synCard.appendChild(readingP(INTERP.dignitySynthesis));
+  wrap.appendChild(synCard);
+  const table = el('table');
+  const thead = el('thead');
+  thead.appendChild(el('tr',{},['Planet','Sign','Score','Dignities & Debilities'].map(h=>el('th',{text:h}))));
+  table.appendChild(thead);
+  const tbody = el('tbody');
+  Object.entries(NATAL.dignities).forEach(([name,d])=>{
+    const p = NATAL.points[name];
+    const tr = el('tr');
+    tr.appendChild(el('td',{text:name}));
+    tr.appendChild(el('td',{text:fmtPos(p)}));
+    tr.appendChild(el('td',{class:'num', text:(d.score>=0?'+':'')+d.score}));
+    tr.appendChild(el('td',{text:d.tags.join(', ')||'peregrine'}));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+  container.appendChild(wrap);
+}
+
+// ---------- DISPOSITORS ----------
+function renderDispositors(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Rulership Chains'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Dispositors'}));
+  wrap.appendChild(ledeP('Each planet traced through its sign ruler until the chain closes on itself or loops.'));
+  ['modern','traditional'].forEach(scheme=>{
+    const card = el('div',{class:'card'});
+    card.appendChild(el('div',{class:'card-title', text: scheme + ' rulerships'}));
+    card.appendChild(readingP(INTERP.dispositors[scheme]));
+    Object.entries(NATAL.dispositors[scheme].chains).forEach(([planet,chain])=>{
+      const row = el('div',{class:'chain-row'});
+      chain.forEach((node,i)=>{
+        row.appendChild(el('span',{class:'chain-node', text:node}));
+        if(i<chain.length-1) row.appendChild(el('span',{class:'chain-arrow', text:'\u2192'}));
+      });
+      card.appendChild(row);
+    });
+    wrap.appendChild(card);
+  });
+  container.appendChild(wrap);
+}
+
+// ---------- FIXED STARS ----------
+function renderFixedStars(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Sidereal Contacts'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Fixed Stars'}));
+  wrap.appendChild(ledeP('Conjunctions to planets, nodes, and angles within 1.5\u00b0, from the full Swiss Ephemeris star catalog.'));
+  if(NATAL.fixed_stars.length===0){
+    wrap.appendChild(ledeP('No conjunctions within orb.'));
+  } else {
+    [...NATAL.fixed_stars].sort((a,b)=>a.orb-b.orb).forEach(h=>{
+      const key = h.point+'|'+h.star;
+      const text = INTERP.fixedStars[key];
+      const card = el('div',{class:'reading-card'});
+      card.appendChild(el('div',{class:'rc-head', html:`${h.point} conjunct ${h.star}  <span class="orb">orb ${h.orb.toFixed(2)}\u00b0</span>`}));
+      if(text) card.appendChild(readingP(text));
+      wrap.appendChild(card);
+    });
+  }
+  container.appendChild(wrap);
+}
+
+// ---------- ARABIC PARTS ----------
+function renderLots(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Hermetic Lots'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Arabic Parts'}));
+  wrap.appendChild(ledeP('The seven Hermetic lots of Valens plus the lot of marriage, computed by sect.'));
+  const table = el('table');
+  table.appendChild(el('thead',{},[el('tr',{},['Part','Position','House'].map(h=>el('th',{text:h})))]));
+  const tbody = el('tbody');
+  Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
+    const tr = el('tr');
+    tr.appendChild(el('td',{text:name}));
+    tr.appendChild(el('td',{class:'num', text:fmtPos(p)}));
+    tr.appendChild(el('td',{class:'num', text:p.house}));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  wrap.appendChild(table);
+
+  wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
+  Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
+    const text = INTERP.arabicParts[name];
+    if(!text) return;
+    const card = el('div',{class:'reading-card'});
+    card.appendChild(el('div',{class:'rc-head', text:`${name}  \u00b7  ${fmtPos(p)}, house ${p.house}`}));
+    card.appendChild(readingP(text));
+    wrap.appendChild(card);
+  });
+  container.appendChild(wrap);
+}
+
+// ---------- HARMONICS ----------
+function renderHarmonics(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Harmonic Charts'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Harmonics'}));
+  wrap.appendChild(ledeP('The Hth harmonic multiplies every natal longitude by H (mod 360\u00b0). The 5th shows creative/talent threads, the 7th the inspirational/dissolving current, the 9th completion and belief.'));
+  const btnRow = el('div',{class:'harm-select'});
+  const body = el('div');
+  [5,7,9].forEach(h=>{
+    const btn = el('button',{class:'harm-btn'+(h===5?' active':''), text:h+'H'});
+    btn.onclick = ()=>{
+      [...btnRow.children].forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      renderHarmonicBody(body, h);
+    };
+    btnRow.appendChild(btn);
+  });
+  wrap.appendChild(btnRow);
+  wrap.appendChild(body);
+  renderHarmonicBody(body, 5);
+  container.appendChild(wrap);
+}
+function renderHarmonicBody(body, h){
+  body.innerHTML='';
+  const data = NATAL.harmonics[h];
+  const synCard = el('div',{class:'card'});
+  synCard.appendChild(el('div',{class:'card-title', text:h+'H Reading'}));
+  synCard.appendChild(readingP(INTERP.harmonics[String(h)]));
+  body.appendChild(synCard);
+  const table = el('table');
+  table.appendChild(el('thead',{},[el('tr',{},['Point','Position'].map(x=>el('th',{text:x})))]));
+  const tbody = el('tbody');
+  Object.entries(data.positions).forEach(([name,p])=>{
+    const tr = el('tr');
+    tr.appendChild(el('td',{text:name}));
+    tr.appendChild(el('td',{class:'num', text:fmtPos(p)}));
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  body.appendChild(table);
+  const asps = [...data.aspects].filter(a=>a.orb<1.5).sort((a,b)=>a.orb-b.orb).slice(0,16);
+  if(asps.length){
+    const card = el('div',{class:'card', style:'margin-top:14px;'});
+    card.appendChild(el('div',{class:'card-title', text:'Tightest harmonic aspects (< 1.5\u00b0)'}));
+    asps.forEach(a=>card.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`${a.p1} ${a.aspect} ${a.p2}, orb ${a.orb.toFixed(2)}\u00b0`})));
+    body.appendChild(card);
+  }
+}
+
+// ---------- PROGRESSIONS ----------
+function renderProgressions(container){
+  const wrap = el('div');
+  const todayStr = new Date().toISOString().slice(0,10);
+  const clamped = AD.clampDate(todayStr);
+  const {positions, age} = AD.progressedPositions(clamped);
+  const sa = AD.solarArc(clamped);
+
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Symbolic Time'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Progressions & Solar Arc'}));
+  wrap.appendChild(ledeP(`As of ${clamped}. Age ${age.toFixed(2)} years. One day after birth stands for one year of life.`));
+
+  const card1 = el('div',{class:'card'});
+  card1.appendChild(el('div',{class:'card-title', text:'Secondary Progressed Positions'}));
+  const t1 = el('table');
+  t1.appendChild(el('thead',{},[el('tr',{},['Point','Position'].map(h=>el('th',{text:h})))]));
+  const tb1 = el('tbody');
+  const progOrder = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto','Ascendant','Midheaven'];
+  progOrder.forEach(name=>{
+    const lon = positions[name];
+    const p = degToSign(lon);
+    const tr = el('tr');
+    tr.appendChild(el('td',{text:name}));
+    tr.appendChild(el('td',{class:'num', text:fmtPos(p)}));
+    tb1.appendChild(tr);
+  });
+  t1.appendChild(tb1);
+  card1.appendChild(t1);
+  wrap.appendChild(card1);
+
+  const progAspects = transitAspects(positions, AD.natalLons, {fast:1.5,personal:1.5,social:1.5,outer:1.5})
+                        .filter(a=>a.transiting!==a.natal).slice(0,12);
+  if(progAspects.length){
+    const card2 = el('div',{class:'card'});
+    card2.appendChild(el('div',{class:'card-title', text:'Progressed Aspects to Natal (< 1.5\u00b0)'}));
+    progAspects.forEach(a=>card2.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`Progressed ${a.transiting} ${a.aspect} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0`})));
+    wrap.appendChild(card2);
+  }
+
+  const card3 = el('div',{class:'card'});
+  card3.appendChild(el('div',{class:'card-title', text:`Solar Arc Directions (arc = ${sa.arcDeg.toFixed(3)}\u00b0)`}));
+  const saAspects = transitAspects(sa.directed, AD.natalLons, {fast:1.2,personal:1.2,social:1.2,outer:1.2})
+                      .filter(a=>a.transiting!==a.natal && a.transiting!=='South Node').slice(0,12);
+  if(saAspects.length===0){ card3.appendChild(ledeP('No directed contacts within 1.2\u00b0 right now.')); }
+  saAspects.forEach(a=>card3.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`Directed ${a.transiting} ${a.aspect} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0`})));
+  wrap.appendChild(card3);
+
+  container.appendChild(wrap);
+}
+
+// ---------- HOROSCOPE ----------
+let horoscopeState = { mode:'daily', date: null };
+function renderHoroscopePanel(container){
+  const wrap = el('div');
+  wrap.appendChild(el('p',{class:'eyebrow', text:'Live Ephemeris'}));
+  wrap.appendChild(el('h2',{class:'section-title', text:'Horoscope'}));
+  wrap.appendChild(ledeP(`Generated from the actual transiting sky against your natal chart. Data runs ${AD.dateRange().start} to ${AD.dateRange().end}.`));
+
+  const subtabs = el('div',{class:'hor-subtabs'});
+  const modes = [['daily','Today'],['weekly','This Week'],['monthly','This Month']];
+  modes.forEach(([m,label])=>{
+    const b = el('button',{class:'hor-subtab'+(horoscopeState.mode===m?' active':''), text:label});
+    b.onclick=()=>{ horoscopeState.mode=m; renderHoroscopeBody(); };
+    subtabs.appendChild(b);
+  });
+  wrap.appendChild(subtabs);
+
+  const nav = el('div',{class:'hor-nav'});
+  const prevBtn = el('button',{text:'\u2190'});
+  const nextBtn = el('button',{text:'\u2192'});
+  const dateLabel = el('span',{class:'hor-date'});
+  const todayBtn = el('button',{text:'Today'});
+  nav.appendChild(prevBtn); nav.appendChild(dateLabel); nav.appendChild(nextBtn); nav.appendChild(todayBtn);
+  wrap.appendChild(nav);
+
+  const body = el('div',{class:'card'});
+  wrap.appendChild(body);
+  container.appendChild(wrap);
+
+  if(!horoscopeState.date) horoscopeState.date = AD.clampDate(new Date().toISOString().slice(0,10));
+
+  function step(days){
+    const d = new Date(horoscopeState.date+'T00:00:00Z');
+    d.setUTCDate(d.getUTCDate()+days);
+    horoscopeState.date = AD.clampDate(d.toISOString().slice(0,10));
+    renderHoroscopeBody();
+  }
+  prevBtn.onclick = ()=> step(horoscopeState.mode==='daily'?-1:horoscopeState.mode==='weekly'?-7:-30);
+  nextBtn.onclick = ()=> step(horoscopeState.mode==='daily'?1:horoscopeState.mode==='weekly'?7:30);
+  todayBtn.onclick = ()=>{ horoscopeState.date = AD.clampDate(new Date().toISOString().slice(0,10)); renderHoroscopeBody(); };
+
+  function renderHoroscopeBody(){
+    [...subtabs.children].forEach((b,i)=>b.classList.toggle('active', modes[i][0]===horoscopeState.mode));
+    body.innerHTML='';
+    let report, titleText;
+    if(horoscopeState.mode==='daily'){
+      report = dailyReport(AD, horoscopeState.date);
+      dateLabel.textContent = report.date;
+      titleText = report.date;
+    } else if(horoscopeState.mode==='weekly'){
+      report = weeklyReport(AD, horoscopeState.date);
+      dateLabel.textContent = `${report.start} to ${report.end}`;
+      titleText = `Week of ${report.start}`;
+    } else {
+      const monthStr = horoscopeState.date.slice(0,7);
+      report = monthlyReport(AD, monthStr);
+      dateLabel.textContent = monthStr;
+      titleText = monthStr;
+    }
+    body.appendChild(el('div',{class:'card-title', text: titleText}));
+    body.appendChild(renderReportText(report.text));
+  }
+  renderHoroscopeBody();
+}
+function renderReportText(text){
+  const container = el('div');
+  const lines = text.split('\n');
+  let ul = null;
+  lines.forEach(line=>{
+    if(line.trim()===''){ ul=null; return; }
+    if(line.startsWith('\u2022 ')){
+      if(!ul){ ul = el('ul',{style:'margin:6px 0 12px; padding-left:18px;'}); container.appendChild(ul); }
+      ul.appendChild(el('li',{class:'hor-text', style:'margin-bottom:8px;', text:line.slice(2)}));
+    } else {
+      ul=null;
+      container.appendChild(el('p',{class:'hor-text hor-lede', style:'margin:0 0 10px; font-weight:600;', text:line}));
+    }
+  });
+  return container;
+}
+
+// ---------- TABS / INIT ----------
+const TABS = [
+  ['overview','Overview', renderOverview],
+  ['wheel','Wheel', renderWheelPanel],
+  ['placements','Placements', renderPlacements],
+  ['aspects','Aspects', renderAspectsPanel],
+  ['dignities','Dignities', renderDignities],
+  ['dispositors','Dispositors', renderDispositors],
+  ['stars','Fixed Stars', renderFixedStars],
+  ['lots','Arabic Parts', renderLots],
+  ['harmonics','Harmonics', renderHarmonics],
+  ['progressions','Progressions', renderProgressions],
+  ['horoscope','Horoscope', renderHoroscopePanel],
+];
+
+function initApp(){
+  NATAL = window.NATAL_DATA;
+  AD = new AstroData(window.NATAL_DATA, window.TRANSIT_DATA, window.PROGRESSIONS_DATA);
+
+  const tabBar = $('#tabs');
+  const panels = $('#panels');
+  TABS.forEach(([id,label,renderFn],i)=>{
+    const btn = el('button',{class:'tab'+(i===0?' active':''), text:label});
+    const panel = el('div',{class:'panel'+(i===0?' active':''), id:'panel-'+id});
+    btn.onclick = ()=>{
+      [...tabBar.children].forEach(x=>x.classList.remove('active'));
+      [...panels.children].forEach(x=>x.classList.remove('active'));
+      btn.classList.add('active');
+      panel.classList.add('active');
+      if(!rendered[id]){ renderFn(panel); rendered[id]=true; }
+    };
+    tabBar.appendChild(btn);
+    panels.appendChild(panel);
+  });
+  renderOverview($('#panel-overview'));
+  rendered['overview']=true;
+}
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script>
+(async function bootstrap(){
+  const cfg = window.DE_CAELO_CONFIG;
+  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  const loadingScreen = document.getElementById('loadingScreen');
+  const loadingDetail = document.getElementById('loadingDetail');
+  const appEl = document.getElementById('app');
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if(!session){ location.href = 'login.html'; return; }
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }] = await Promise.all([
+    supabase.from('charts').select('natal_json,prog_json').eq('user_id', user.id).maybeSingle(),
+    supabase.from('sky_snapshots').select('transit_json').eq('id', 1).maybeSingle(),
+  ]);
+
+  if(chartErr || !chart){ location.href = 'onboarding.html'; return; }
+  if(skyErr || !sky){
+    loadingDetail.textContent = 'Could not load current sky data. Try reloading.';
+    return;
+  }
+
+  window.NATAL_DATA = chart.natal_json;
+  window.TRANSIT_DATA = sky.transit_json;
+  window.PROGRESSIONS_DATA = chart.prog_json;
+
+  loadingScreen.style.display = 'none';
+  appEl.style.display = '';
+  initApp();
+})();
+</script>
+<script src="oracle.js"></script>
+</body>
+</html>

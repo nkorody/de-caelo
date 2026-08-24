@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>De Caelo — Onboarding</title>
+<link rel="stylesheet" href="style.css"/>
+<style>
+  .city-results{border:2px solid var(--ink-4); border-top:none; max-height:200px; overflow-y:auto; margin-top:-12px; margin-bottom:12px;}
+  .city-result{padding:8px 12px; cursor:pointer; font-size:14px; border-bottom:1px solid var(--ink-4);}
+  .city-result:last-child{border-bottom:none;}
+  .city-result:hover, .city-result.sel{background:var(--paper); color:var(--ink);}
+  .manual-toggle{font-family:var(--mono); font-size:11px; color:var(--paper-faint); cursor:pointer; text-decoration:underline; margin:-4px 0 4px;}
+  .manual-fields{display:none; gap:12px;}
+  .manual-fields.show{display:flex;}
+  .manual-fields input{flex:1;}
+  .computing{display:none; text-align:center;}
+  .computing .eyebrow{margin-bottom:14px;}
+  .computing p{font-size:14px; color:var(--paper-dim); line-height:1.6; margin:14px 0 0;}
+  .computing .spinner{font-family:var(--mono); font-size:22px; letter-spacing:0.3em; animation:pulse 1.2s ease-in-out infinite;}
+  .computing #computingExtra{color:var(--paper-faint); font-size:12.5px;}
+  @keyframes pulse{0%,100%{opacity:0.3;} 50%{opacity:1;}}
+</style>
+</head>
+<body>
+
+<div class="auth-screen">
+  <div class="auth-box" style="max-width:480px;">
+    <div class="auth-mark">DE CAELO — ONBOARDING</div>
+
+    <div id="formState">
+      <p class="lede" style="text-align:center;margin:0 0 20px;font-size:13.5px;">
+        Your birth data, entered by you. Used only to compute your own chart.
+      </p>
+      <form id="birthForm">
+        <label for="date">Birth date</label>
+        <input type="date" id="date" required/>
+
+        <label for="time">Birth time</label>
+        <input type="time" id="time" required/>
+        <div class="auth-note" style="margin-top:-6px;">If you don't know the exact time, use your best estimate — house placements will be less precise, everything else still works.</div>
+
+        <label for="place">Birth place</label>
+        <input type="text" id="place" autocomplete="off" placeholder="Start typing a city..." required/>
+        <div class="city-results" id="cityResults" style="display:none;"></div>
+        <div class="manual-toggle" id="manualToggle">City not listed? Enter coordinates manually.</div>
+        <div class="manual-fields" id="manualFields">
+          <div style="flex:1;">
+            <label for="latManual">Latitude</label>
+            <input type="number" id="latManual" step="0.0001" placeholder="34.0195"/>
+          </div>
+          <div style="flex:1;">
+            <label for="lonManual">Longitude</label>
+            <input type="number" id="lonManual" step="0.0001" placeholder="-118.4912"/>
+          </div>
+        </div>
+
+        <button type="submit" id="submitBtn">Compute My Chart</button>
+        <div class="auth-error" id="formError"></div>
+      </form>
+    </div>
+
+    <div class="computing" id="computingState">
+      <div class="eyebrow">Computing your chart</div>
+      <div class="spinner" id="spinner">···</div>
+      <p>Running Swiss Ephemeris calculations for natal placements, current transits, and secondary progressions. Usually 10 to 30 seconds.</p>
+      <p id="computingExtra" style="display:none;">Still working. The computation service sleeps when idle and can take up to a minute to wake up on the first request after a while.</p>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="onboarding.js"></script>
+</body>
+</html>

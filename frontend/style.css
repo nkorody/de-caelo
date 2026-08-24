@@ -1,0 +1,82 @@
+/* De Caelo — shared design tokens and base components.
+   Extracted verbatim from dc.html/app.html's own <style> block so login.html
+   and onboarding.html match exactly. app.html keeps its full styling inline
+   and does not depend on this file — this exists for the new pages only. */
+:root{
+  --ink:#000000; --ink-2:#000000; --ink-3:#0a0a0a; --ink-4:#ffffff;
+  --paper:#ffffff; --paper-dim:#c4c4c4; --paper-faint:#7a7a7a;
+  --red:#ffffff; --red-bright:#ffffff; --red-dim:#a0a0a0;
+  --verdigris:#e0e0e0; --verdigris-dim:#8a8a8a;
+  --brass:#ffffff; --brass-dim:#5a5a5a; --brass-bright:#ffffff;
+  --serif: "Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
+  --mono: "IBM Plex Mono","JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  background:var(--ink);
+  color:var(--paper);
+  font-family:var(--serif);
+  min-height:100vh;
+}
+#app{
+  max-width:1180px;margin:16px auto;padding:40px 34px 84px;
+  border:3px solid var(--ink-4);
+}
+
+.orn{flex-shrink:0; font-size:15px; line-height:1; color:var(--paper);}
+.orn::after{content:'\2767';}
+
+.eyebrow{
+  font-family:var(--mono); font-size:11px; letter-spacing:0.18em; text-transform:uppercase;
+  color:var(--paper); font-weight:700; margin:0 0 8px;
+}
+h2.section-title{font-size:23px; font-weight:700; margin:0 0 4px; letter-spacing:0.02em; color:var(--paper); text-transform:uppercase;}
+p.lede{color:var(--paper-dim); font-size:15px; line-height:1.6; margin:0 0 22px; max-width:640px;}
+
+.card{
+  background:var(--ink); border:2px solid var(--ink-4); padding:18px 20px 20px; margin-bottom:16px;
+  position:relative;
+}
+.card-title{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; margin:0 0 12px; border-bottom:2px solid var(--ink-4); padding-bottom:8px;}
+
+.divider{display:flex; align-items:center; gap:12px; margin:28px 0 20px; opacity:0.9;}
+.divider .line{flex:1; height:1px; background:var(--brass-dim);}
+
+.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:28px; line-height:1.7; border-top:3px solid var(--ink-4); padding-top:14px;}
+
+::-webkit-scrollbar{width:8px; height:8px;}
+::-webkit-scrollbar-thumb{background:var(--paper-faint);}
+
+/* centered box pattern, generalized from dc.html's #gate/.gate-box (that
+   screen itself is retired — a hardcoded client-side password is not real
+   security — but the visual pattern is reused for real auth screens) */
+.auth-screen{
+  position:fixed; inset:0; z-index:100; display:flex; align-items:center; justify-content:center;
+  background:var(--ink);
+  padding:20px;
+}
+.auth-box{
+  width:100%; max-width:420px; text-align:center; background:var(--ink);
+  border:3px solid var(--paper);
+  padding:38px 30px 32px; margin:7px;
+}
+.auth-box .auth-mark{font-family:var(--mono); font-size:13px; letter-spacing:0.16em; font-weight:700; margin-bottom:22px;}
+.auth-box form{display:flex; flex-direction:column; gap:12px; text-align:left;}
+.auth-box label{font-family:var(--mono); font-size:11px; letter-spacing:0.08em; text-transform:uppercase; color:var(--paper-faint);}
+.auth-box input, .auth-box select{
+  font-family:var(--mono); font-size:15px; padding:10px 12px; background:var(--ink); color:var(--paper);
+  border:2px solid var(--ink-4); letter-spacing:0.02em; border-radius:0; width:100%;
+}
+.auth-box input:focus, .auth-box select:focus{outline:none; border-color:var(--paper);}
+.auth-box button{
+  font-family:var(--mono); font-size:12px; letter-spacing:0.12em; text-transform:uppercase; cursor:pointer;
+  padding:12px 12px; background:var(--paper); color:var(--ink); border:2px solid var(--paper); font-weight:700;
+  margin-top:8px;
+}
+.auth-box button:hover{background:var(--ink); color:var(--paper);}
+.auth-box button:disabled{opacity:0.5; cursor:default; background:var(--paper-faint); border-color:var(--paper-faint);}
+.auth-box .auth-error{font-family:var(--mono); font-size:11.5px; color:var(--paper); font-weight:700; margin-top:14px; letter-spacing:0.04em; visibility:hidden;}
+.auth-box .auth-error.show{visibility:visible;}
+.auth-box .auth-note{font-family:var(--mono); font-size:11px; color:var(--paper-faint); margin-top:16px; line-height:1.6;}
+.auth-box .auth-note a{color:var(--paper); cursor:pointer;}

@@ -27,8 +27,6 @@ body{
   border:3px solid var(--ink-4);
 }
 
-.orn{flex-shrink:0; font-size:15px; line-height:1; color:var(--paper);}
-.orn::after{content:'\2767';}
 
 .tabs{
   display:flex; flex-wrap:nowrap; gap:0; margin-bottom:24px;
@@ -101,6 +99,14 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 
 .wheel-wrap{display:flex; justify-content:center; padding:10px 0 14px; position:relative;}
 .wheel-wrap svg{max-width:100%; height:auto;}
+.wheel-planet{cursor:help;}
+.wheel-planet .wp-halo{transition:stroke-width .15s ease, opacity .15s ease; opacity:0;}
+.wheel-planet .wp-body{transition:filter .15s ease;}
+.wheel-planet:hover .wp-halo, .wheel-planet:focus .wp-halo{stroke-width:2; opacity:0.85;}
+.wheel-planet:hover .wp-body, .wheel-planet:focus .wp-body{filter:drop-shadow(0 0 5px rgba(230,57,70,0.9));}
+.wheel-tip{position:fixed; z-index:120; background:#000; border:2px solid var(--paper); color:#fff; font-size:13px; line-height:1.5; padding:9px 11px; width:240px; max-width:70vw; pointer-events:none; font-family:var(--serif); visibility:hidden; opacity:0; transition:opacity .12s ease;}
+.wheel-tip.show{visibility:visible; opacity:1;}
+.wheel-tip b{display:block; font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase; color:var(--paper); margin-bottom:4px;}
 
 .chain-row{display:flex; align-items:center; gap:8px; flex-wrap:wrap; font-family:var(--mono); font-size:14px; margin-bottom:10px;}
 .chain-node{padding:3px 9px; background:var(--ink); border:1px solid var(--paper); color:var(--paper);}
@@ -182,7 +188,7 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 <div class="oracle-drawer" id="oracleDrawer">
   <div class="oracle-drawer-head"><span>Ask</span><button id="oracleClose">&times;</button></div>
   <div class="oracle-drawer-body" id="oracleBody">
-    <p class="reading" style="font-size:13.5px;">Answered from your actual chart and the real sky today, not a generic model.</p>
+    <p class="reading" style="font-size:13.5px;">Answered from your actual chart and the real sky today, not a generic model. May take a few moments to respond.</p>
   </div>
   <form class="oracle-form" id="oracleForm">
     <textarea id="oracleInput" placeholder="Ask anything&hellip;" required></textarea>
@@ -210,6 +216,9 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
   .oracle-form button{font-family:var(--mono); font-size:12px; letter-spacing:0.08em; text-transform:uppercase; background:var(--paper); color:var(--ink); border:2px solid var(--paper); padding:11px; cursor:pointer; font-weight:700;}
   .oracle-form button:hover{background:var(--ink); color:var(--paper);}
   .oracle-form button:disabled{opacity:0.5; cursor:default;}
+  .oracle-loader{display:flex; align-items:center; gap:10px; color:var(--paper-faint); font-size:12.5px; font-family:var(--mono);}
+  .oracle-loader svg{animation:oracle-spin 2.4s linear infinite; flex-shrink:0;}
+  @keyframes oracle-spin{ to{ transform:rotate(360deg); } }
 </style>
 
 <script>
@@ -661,10 +670,16 @@ const WHEEL_GLYPH = {'Sun':TXT('\u2609'),'Moon':TXT('\u263D'),'Mercury':TXT('\u2
 const WHEEL_SIGN_GLYPH = ['\u2648','\u2649','\u264A','\u264B','\u264C','\u264D','\u264E','\u264F','\u2650','\u2651','\u2652','\u2653'].map(TXT);
 
 // Engraving palette: black, white, grey only
+// Color reintroduced here specifically (not elsewhere in the app -- aspect
+// pills etc. stay monochrome per the brutalist system). The lede text below
+// already described "verdigris lines are soft aspects, red lines are hard
+// aspects" from an earlier design; the actual rendering had been desaturated
+// to white-on-width during the brutalist pass without updating that text.
+// This makes the description true again rather than leaving it stale.
 const WC = {
-  brass:'#9c9c9c', brassDim:'#4a4a4a', brassBright:'#ffffff',
-  red:'#ffffff', redBright:'#ffffff',
-  verdigris:'#ffffff',
+  brass:'#9c9c9c', brassDim:'#5a5a5a', brassBright:'#ffffff',
+  red:'#c1272d', redBright:'#e63946',
+  verdigris:'#4f9d8a', verdigrisDim:'#356b60',
   panelA:'#000000', panelB:'#0d0d0d', panelInner:'#000000',
   paper:'#ffffff', ink:'#000000',
 };
@@ -723,11 +738,11 @@ function buildWheelSVG(natal){
     const isAngle = (i===0||i===3||i===6||i===9);
     const [x1,y1] = pt(lon, rHouseIn);
     const [x2,y2] = pt(lon, rHouseOut);
-    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isAngle?WC.red:WC.brassDim}" stroke-width="${isAngle?1.9:0.7}" stroke-dasharray="${isAngle?'none':'2,2'}"/>`);
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isAngle?WC.red:WC.brass}" stroke-width="${isAngle?1.9:0.9}" stroke-dasharray="${isAngle?'none':'2,2'}"/>`);
     const nextLon = cusps[(i+1)%12];
     const midLon = norm360(lon + norm360(nextLon-lon)/2);
     const [lx,ly] = pt(midLon, rHouseIn-16);
-    svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="11" fill="${WC.brassDim}" font-family="serif">${i+1}</text>`);
+    svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="bold" fill="${WC.brass}" font-family="serif">${i+1}</text>`);
     if(isAngle){
       const [ax,ay] = pt(lon, rOuter+22);
       svg.push(`<text x="${ax}" y="${ay}" text-anchor="middle" dominant-baseline="central" font-size="13" fill="${WC.redBright}" font-family="serif" font-weight="bold">${angleNames[i]}</text>`);
@@ -745,10 +760,10 @@ function buildWheelSVG(natal){
     const [x1,y1] = pt(natal.points[a.p1].lon, rInner);
     const [x2,y2] = pt(natal.points[a.p2].lon, rInner);
     let color = WC.brassDim, width=0.6, dash='none';
-    if(a.aspect==='Trine'||a.aspect==='Sextile'){ color=WC.paper; width=0.6; }
-    else if(a.aspect==='Square'||a.aspect==='Opposition'){ color=WC.paper; width=1.7; }
-    else { color=WC.brassDim; dash='3,3'; width=0.6; }
-    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-dasharray="${dash}" opacity="0.85"/>`);
+    if(a.aspect==='Trine'||a.aspect==='Sextile'){ color=WC.verdigris; width=0.9; }
+    else if(a.aspect==='Square'||a.aspect==='Opposition'){ color=WC.red; width=1.4; }
+    else { color=WC.brassDim; dash='1,3.5'; width=0.8; }
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${color}" stroke-width="${width}" stroke-dasharray="${dash}" opacity="0.9"/>`);
   });
 
   // planet placement with collision avoidance
@@ -773,9 +788,11 @@ function buildWheelSVG(natal){
       const [gx,gy] = pt(p.lon, r);
       const [tx,ty] = pt(p.lon, rZodiacIn-4);
       svg.push(`<line x1="${tx}" y1="${ty}" x2="${gx}" y2="${gy}" stroke="${WC.brassDim}" stroke-width="0.4" opacity="0.5"/>`);
-      svg.push(`<circle cx="${gx}" cy="${gy}" r="12.5" fill="${WC.panelInner}" stroke="${WC.red}" stroke-width="0.6"/>`);
-      svg.push(`<text x="${gx}" y="${gy}" text-anchor="middle" dominant-baseline="central" font-size="15" fill="${WC.paper}" font-family="serif">${WHEEL_GLYPH[p.name]}<title>${p.name}</title></text>`);
-      svg.push(`<title>${p.name}: ${natal.points[p.name].deg}\u00b0${String(natal.points[p.name].min).padStart(2,'0')}' ${natal.points[p.name].sign}</title>`);
+      svg.push(`<g class="wheel-planet" data-planet="${p.name}" tabindex="0">`);
+      svg.push(`<circle class="wp-halo" cx="${gx}" cy="${gy}" r="18" fill="none" stroke="${WC.redBright}" stroke-width="0"/>`);
+      svg.push(`<circle class="wp-body" cx="${gx}" cy="${gy}" r="12.5" fill="${WC.panelInner}" stroke="${WC.red}" stroke-width="0.6"/>`);
+      svg.push(`<text x="${gx}" y="${gy}" text-anchor="middle" dominant-baseline="central" font-size="15" fill="${WC.paper}" font-family="serif">${WHEEL_GLYPH[p.name]}</text>`);
+      svg.push(`</g>`);
     });
   });
 
@@ -951,7 +968,7 @@ function collectKeyAspects(){
 }
 function readingP(text){ return el('p',{class:'reading', html:annotateTerms(text)}); }
 function ledeP(text, extraStyle){ return el('p',{class:'lede', style:extraStyle||'', html:annotateTerms(text)}); }
-function divider(){ return el('div',{class:'divider'},[el('div',{class:'line'}), el('div',{class:'orn'}), el('div',{class:'line'})]); }
+function divider(){ return el('div',{class:'divider'},[el('div',{class:'line'})]); }
 
 // ---------- GLOSSARY / HOVER DEFINITIONS ----------
 const GLOSSARY = {
@@ -1013,7 +1030,7 @@ function renderOverview(container){
   const N = NATAL;
   const sun = N.points['Sun'], moon = N.points['Moon'], asc = N.points['Ascendant'];
   const wrap = el('div');
-  wrap.appendChild(el('p',{class:'eyebrow', text:'De Caelo: Nicholas J. Korody'}));
+  wrap.appendChild(el('h2',{class:'section-title', text: window.USER_DISPLAY_NAME}));
   wrap.appendChild(el('h2',{class:'section-title', text: N.birth.place + ', ' + N.birth.month+'/'+N.birth.day+'/'+N.birth.year + ', ' + N.birth.hour+':'+String(N.birth.minute).padStart(2,'0')}));
   wrap.appendChild(ledeP(`${N.sect.light} above the horizon in the ${N.sect.sun_house}${ordSuf(N.sect.sun_house)} house: a ${N.sect.is_day?'day':'night'} chart.`));
 
@@ -1079,13 +1096,59 @@ function renderOverview(container){
 function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
 
 // ---------- WHEEL ----------
+function wheelPlanetTooltipText(name){
+  const p = NATAL.points[name];
+  if(!p) return name;
+  const houseStr = p.house_placidus ? `, house ${p.house_placidus}` : '';
+  const retro = p.retrograde ? ', retrograde' : '';
+  const def = GLOSSARY_LOWER[name.toLowerCase()];
+  return `${fmtPos(p)}${houseStr}${retro}.` + (def ? ` ${def}` : '');
+}
+function wireWheelTooltip(ww){
+  let tip = document.getElementById('wheelTip');
+  if(!tip){
+    tip = el('div',{class:'wheel-tip', id:'wheelTip'});
+    document.body.appendChild(tip);
+  }
+  function show(target, evt){
+    const name = target.dataset.planet;
+    tip.innerHTML = `<b>${name}</b>${escapeHtml(wheelPlanetTooltipText(name))}`;
+    tip.classList.add('show');
+    move(evt);
+  }
+  function move(evt){
+    const pad = 14;
+    let x = evt.clientX + pad, y = evt.clientY + pad;
+    if(x + 240 > window.innerWidth) x = evt.clientX - 240 - pad;
+    if(y + 90 > window.innerHeight) y = evt.clientY - 90 - pad;
+    tip.style.left = x + 'px';
+    tip.style.top = y + 'px';
+  }
+  function hide(){ tip.classList.remove('show'); }
+  ww.addEventListener('mouseover', (e)=>{
+    const g = e.target.closest('.wheel-planet');
+    if(g) show(g, e);
+  });
+  ww.addEventListener('mousemove', (e)=>{
+    if(e.target.closest('.wheel-planet')) move(e);
+  });
+  ww.addEventListener('mouseout', (e)=>{
+    if(e.target.closest('.wheel-planet') && !e.relatedTarget?.closest?.('.wheel-planet')) hide();
+  });
+  ww.addEventListener('focusin', (e)=>{
+    const g = e.target.closest('.wheel-planet');
+    if(g) show(g, {clientX: g.getBoundingClientRect().left, clientY: g.getBoundingClientRect().top});
+  });
+  ww.addEventListener('focusout', hide);
+}
 function renderWheelPanel(container){
   const wrap = el('div');
   wrap.appendChild(el('p',{class:'eyebrow', text:'The Wheel'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Natal Chart'}));
-  wrap.appendChild(ledeP('Placidus houses. Ascendant fixed at the left. Red lines mark the four angles; dashed grey lines mark intermediate house cusps. Verdigris lines are soft aspects, red lines are hard aspects, dotted grey lines are quincunxes.'));
+  wrap.appendChild(ledeP('Placidus houses. Ascendant fixed at the left. Red lines mark the four angles; grey lines mark intermediate house cusps. Verdigris lines are soft aspects, red lines are hard aspects, dotted grey lines are quincunxes. Hover a planet for its exact placement.'));
   const ww = el('div',{class:'wheel-wrap', html: buildWheelSVG(NATAL)});
   wrap.appendChild(ww);
+  wireWheelTooltip(ww);
   const legend = el('div',{class:'card'});
   legend.appendChild(el('div',{class:'card-title', text:'Glyph Key'}));
   const g = el('div',{class:'grid grid-4', style:'font-family:var(--mono); font-size:12px;'});
@@ -1119,6 +1182,13 @@ function renderPlacements(container){
     tr.appendChild(el('td',{class:'num', text:p.house_placidus||'\u2014'}));
     tr.appendChild(el('td',{class:'num', text:p.house_whole_sign||'\u2014'}));
     tr.appendChild(el('td',{class:'num', text: p.speed!==null && p.speed!==undefined ? p.speed.toFixed(4) : '\u2014'}));
+    if(INTERP.placements[name]){
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => {
+        const target = document.getElementById('reading-'+name.replace(/\s+/g,'-'));
+        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+      };
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -1129,7 +1199,7 @@ function renderPlacements(container){
     const p = NATAL.points[name];
     const text = INTERP.placements[name];
     if(!p || !text) return;
-    const card = el('div',{class:'reading-card'});
+    const card = el('div',{class:'reading-card', id:'reading-'+name.replace(/\s+/g,'-')});
     card.appendChild(el('div',{class:'rc-head', text:`${p.glyph?TXT(p.glyph):''}  ${name}  \u00b7  ${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}`}));
     card.appendChild(readingP(text));
     wrap.appendChild(card);
@@ -1263,6 +1333,13 @@ function renderLots(container){
     tr.appendChild(el('td',{text:name}));
     tr.appendChild(el('td',{class:'num', text:fmtPos(p)}));
     tr.appendChild(el('td',{class:'num', text:p.house}));
+    if(INTERP.arabicParts[name]){
+      tr.style.cursor = 'pointer';
+      tr.onclick = () => {
+        const target = document.getElementById('lot-reading-'+name.replace(/\s+/g,'-'));
+        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+      };
+    }
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -1272,7 +1349,7 @@ function renderLots(container){
   Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
     const text = INTERP.arabicParts[name];
     if(!text) return;
-    const card = el('div',{class:'reading-card'});
+    const card = el('div',{class:'reading-card', id:'lot-reading-'+name.replace(/\s+/g,'-')});
     card.appendChild(el('div',{class:'rc-head', text:`${name}  \u00b7  ${fmtPos(p)}, house ${p.house}`}));
     card.appendChild(readingP(text));
     wrap.appendChild(card);
@@ -1286,6 +1363,10 @@ function renderHarmonics(container){
   wrap.appendChild(el('p',{class:'eyebrow', text:'Harmonic Charts'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Harmonics'}));
   wrap.appendChild(ledeP('The Hth harmonic multiplies every natal longitude by H (mod 360\u00b0). The 5th shows creative/talent threads, the 7th the inspirational/dissolving current, the 9th completion and belief.'));
+  const harmExplain = el('div',{class:'card'});
+  harmExplain.appendChild(el('div',{class:'card-title', text:'What this is for'}));
+  harmExplain.appendChild(readingP('Not a different chart, the same birth data run through a transformation that brings one specific pattern into focus, one that stays invisible at the natal degree. A tight aspect here that has no equivalent in the natal chart points to something operating below the surface: a working pattern, not necessarily a conscious one. The three shown are the ones with the most established technique behind them, not the only harmonics that exist. Worth checking when the natal chart is silent on something the person clearly experiences.'));
+  wrap.appendChild(harmExplain);
   const btnRow = el('div',{class:'harm-select'});
   const body = el('div');
   [5,7,9].forEach(h=>{
@@ -1340,6 +1421,11 @@ function renderProgressions(container){
   wrap.appendChild(el('p',{class:'eyebrow', text:'Symbolic Time'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Progressions & Solar Arc'}));
   wrap.appendChild(ledeP(`As of ${clamped}. Age ${age.toFixed(2)} years. One day after birth stands for one year of life.`));
+
+  const progExplain = el('div',{class:'card'});
+  progExplain.appendChild(el('div',{class:'card-title', text:'What this is for'}));
+  progExplain.appendChild(readingP('Transits are weather: fast, external, largely reversible, the same sky for everyone, read against one fixed chart. Progressions move the chart itself, slowly, over decades, using one day of ephemeris motion per year of life. The result is closer to internal development than to events: not what is happening to someone, but what chapter of their own unfolding they are actually in. Solar arc is a related but more literal technique: every natal point is advanced by the same arc the progressed Sun has moved, which makes it useful for timing exactly when a natal point gets activated by another point’s directed position crossing it.'));
+  wrap.appendChild(progExplain);
 
   const card1 = el('div',{class:'card'});
   card1.appendChild(el('div',{class:'card-title', text:'Secondary Progressed Positions'}));
@@ -1463,6 +1549,7 @@ function renderReportText(text){
 // ---------- TABS / INIT ----------
 const TABS = [
   ['overview','Overview', renderOverview],
+  ['horoscope','Horoscope', renderHoroscopePanel],
   ['wheel','Wheel', renderWheelPanel],
   ['placements','Placements', renderPlacements],
   ['aspects','Aspects', renderAspectsPanel],
@@ -1472,7 +1559,6 @@ const TABS = [
   ['lots','Arabic Parts', renderLots],
   ['harmonics','Harmonics', renderHarmonics],
   ['progressions','Progressions', renderProgressions],
-  ['horoscope','Horoscope', renderHoroscopePanel],
 ];
 
 function initApp(){
@@ -1512,9 +1598,10 @@ function initApp(){
   if(!session){ location.href = 'login.html'; return; }
 
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }] = await Promise.all([
+  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }] = await Promise.all([
     supabase.from('charts').select('natal_json,prog_json').eq('user_id', user.id).maybeSingle(),
     supabase.from('sky_snapshots').select('transit_json').eq('id', 1).maybeSingle(),
+    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
   ]);
 
   if(chartErr || !chart){ location.href = 'onboarding.html'; return; }
@@ -1526,6 +1613,7 @@ function initApp(){
   window.NATAL_DATA = chart.natal_json;
   window.TRANSIT_DATA = sky.transit_json;
   window.PROGRESSIONS_DATA = chart.prog_json;
+  window.USER_DISPLAY_NAME = (profile && profile.display_name) || (user.email ? user.email.split('@')[0] : 'Your Chart');
 
   loadingScreen.style.display = 'none';
   appEl.style.display = '';

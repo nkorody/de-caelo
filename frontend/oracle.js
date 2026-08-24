@@ -16,6 +16,12 @@ const input = document.getElementById('oracleInput');
 
 let history = []; // {role, content}, kept client-side for this page session only
 
+const OUROBOROS_SVG = `<svg width="20" height="20" viewBox="0 0 40 40" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="20" cy="20" r="15" fill="none" stroke="#fff" stroke-width="2.5" stroke-dasharray="2,3.2"/>
+  <path d="M 20 4 L 24.5 11 L 15.5 11 Z" fill="#fff"/>
+  <circle cx="19" cy="8.2" r="1.1" fill="#000"/>
+</svg>`;
+
 function openDrawer(){ drawer.classList.add('open'); scrim.classList.add('show'); input.focus(); }
 function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove('show'); }
 
@@ -25,11 +31,28 @@ function addMessage(role, text){
   div.textContent = text;
   body.appendChild(div);
   body.scrollTop = body.scrollHeight;
+  return div;
+}
+
+function addLoader(){
+  const div = document.createElement('div');
+  div.className = 'oracle-loader';
+  div.innerHTML = OUROBOROS_SVG + '<span>Consulting the chart&hellip;</span>';
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+  return div;
 }
 
 toggle.addEventListener('click', openDrawer);
 closeBtn.addEventListener('click', closeDrawer);
 scrim.addEventListener('click', closeDrawer);
+
+input.addEventListener('keydown', (e) => {
+  if(e.key === 'Enter' && !e.shiftKey){
+    e.preventDefault();
+    form.requestSubmit();
+  }
+});
 
 form.addEventListener('submit', async (e) => {
   e.preventDefault();
@@ -40,6 +63,7 @@ form.addEventListener('submit', async (e) => {
   input.value = '';
   const btn = document.getElementById('oracleSend');
   btn.disabled = true;
+  const loader = addLoader();
 
   try{
     const { data: { session } } = await supabase.auth.getSession();
@@ -58,8 +82,10 @@ form.addEventListener('submit', async (e) => {
 
     history.push({ role: 'user', content: question });
     history.push({ role: 'assistant', content: payload.reply });
+    loader.remove();
     addMessage('assistant', payload.reply);
   } catch(err){
+    loader.remove();
     addMessage('error', err.message || 'Something went wrong. Try again.');
   } finally {
     btn.disabled = false;

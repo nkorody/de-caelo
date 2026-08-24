@@ -154,19 +154,33 @@ def compute_natal(birth: dict, utc_offset: float) -> tuple[dict, float]:
 
     asc_sign = placements["Ascendant"]["sign"]
 
+    # Alt/Az for the sky visualizer (§ "natal sky visualizer"). Ascendant/Midheaven
+    # get no special-casing: feeding their ecliptic longitude through the same
+    # ECL2HOR call (latitude=0, since both are defined as points on the ecliptic)
+    # geometrically produces Alt≈0 for the Ascendant and a meridian position for
+    # the Midheaven automatically, rather than needing separate formulas.
+    def altaz_for(name):
+        ecl_lat = raw.get(name, {}).get("lat", 0.0)
+        dist = raw.get(name, {}).get("dist", 1.0)
+        az, true_alt, _ = swe.azalt(jd_ut, swe.ECL2HOR, (birth["lon"], birth["lat"], 0), 0, 0, (lons[name], ecl_lat, dist))
+        return round((az + 180) % 360, 3), round(true_alt, 3)  # az converted: swe's south-based-westward -> north-based-eastward
+
+    points = {}
+    for name in lons:
+        az, alt = altaz_for(name)
+        points[name] = {
+            "lon": round(lons[name], 5), **placements[name],
+            "house_placidus": houses.get(name), "house_whole_sign": houses_whole.get(name),
+            "speed": round(raw.get(name, {}).get("speed_lon", 0), 5) if name in raw else None,
+            "retrograde": (raw.get(name, {}).get("speed_lon", 0) < 0) if name in raw else False,
+            "az": az, "alt": alt,
+        }
+
     natal = {
         "birth": {**birth, "utc_offset": utc_offset},
         "jd_ut": jd_ut,
         "sect": {"is_day": is_day, "light": sect_light, "sun_house": sun_house},
-        "points": {
-            name: {
-                "lon": round(lons[name], 5), **placements[name],
-                "house_placidus": houses.get(name), "house_whole_sign": houses_whole.get(name),
-                "speed": round(raw.get(name, {}).get("speed_lon", 0), 5) if name in raw else None,
-                "retrograde": (raw.get(name, {}).get("speed_lon", 0) < 0) if name in raw else False,
-            }
-            for name in lons
-        },
+        "points": points,
         "houses_placidus": {"cusps": [round(c, 4) for c in cusps_p[:12]]},
         "houses_whole_sign": {"cusps": [round(c, 4) for c in cusps_w[:12]]},
         "angles": {"ASC": round(ASC, 4), "MC": round(MC, 4), "DSC": round(DSC, 4), "IC": round(IC, 4), "Vertex": round(VERTEX, 4)},

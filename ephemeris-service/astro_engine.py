@@ -5,8 +5,10 @@ Powered by the Swiss Ephemeris (JPL-derived .se1 data files, arcsecond precision
 import swisseph as swe
 import json, math, os
 
-EPHE_PATH = os.path.join(os.path.dirname(__file__), 'ephe')
+EPHE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ephe')
 swe.set_ephe_path(EPHE_PATH)
+print(f"[astro_engine] EPHE_PATH={EPHE_PATH!r} isdir={os.path.isdir(EPHE_PATH)} "
+      f"n_files={len(os.listdir(EPHE_PATH)) if os.path.isdir(EPHE_PATH) else 'n/a'}", flush=True)
 
 SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces']
 SIGN_GLYPH = ['♈','♉','♊','♋','♌','♍','♎','♏','♐','♑','♒','♓']

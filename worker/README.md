@@ -78,10 +78,15 @@ the same way).
 
 ## Cost control
 
-`max_tokens` is capped at 700 per reply and the model is Claude Sonnet,
-which keeps this cheap for personal use. If you want it cheaper still,
-change `model: 'claude-sonnet-5'` to `'claude-haiku-4-5-20251001'` in
+`max_tokens` is capped at 4096 per reply (this model does extended thinking
+by default, and thinking tokens count against `max_tokens` -- a lower cap
+risked the reply being cut off before any visible text was produced at
+all; confirmed this actually happening in production, not theoretical).
+The model is Claude Sonnet. If you want it cheaper, change
+`model: 'claude-sonnet-5'` to `'claude-haiku-4-5-20251001'` in
 `chat-worker.js` and redeploy; answers will be faster and less nuanced.
+Actual cost per reply is governed by tokens *used*, not the cap, so this
+change alone doesn't cost more unless replies were actually running long.
 
 ## If you want to lock it down further
 

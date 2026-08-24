@@ -276,7 +276,13 @@ export default {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-5',
-            max_tokens: 700,
+            // Confirmed via live Worker logs: this model does extended thinking by
+            // default, and a "thinking" content block counts against max_tokens.
+            // At 700, thinking alone could consume the whole budget before any
+            // visible text was produced (stop_reason: max_tokens, empty thinking
+            // block, zero text blocks) -- not rare, reproduced on back-to-back
+            // requests. Raised well past a plausible thinking-pass length.
+            max_tokens: 4096,
             system: SYSTEM_PROMPT + '\n\n--- CHART AND CURRENT SKY DATA ---\n\n' + chartContext,
             messages,
           }),
@@ -284,11 +290,15 @@ export default {
 
         if (!apiRes.ok) {
           lastErrText = await apiRes.text();
+          console.error(`Anthropic API error, attempt ${attempt + 1}, status ${apiRes.status}:`, lastErrText.slice(0, 1000));
           continue;
         }
 
         const data = await apiRes.json();
         text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        if (!text) {
+          console.error(`Empty text content, attempt ${attempt + 1}. stop_reason=${data.stop_reason}, content=`, JSON.stringify(data.content).slice(0, 500));
+        }
       }
 
       if (!text) {

@@ -1,0 +1,34 @@
+name: Refresh shared transit window
+
+# Populates Supabase's sky_snapshots table (§4.2 of the master reference).
+# Runs as a GitHub Actions job rather than a public HTTP endpoint on purpose:
+# this script holds SUPABASE_SERVICE_ROLE_KEY, which bypasses Row Level
+# Security entirely, so it should never be reachable over the internet.
+# A scheduled Actions run has no public ingress at all, and the runner is
+# ephemeral and torn down when the job finishes.
+#
+# The window itself only needs to move as window_end approaches, so monthly
+# is plenty; workflow_dispatch is here too so it can be triggered manually
+# (initial population, or after changing the window bounds in compute.py).
+
+on:
+  schedule:
+    - cron: "0 6 1 * *"  # 06:00 UTC on the 1st of every month
+  workflow_dispatch: {}
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ephemeris-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install -r requirements.txt
+      - run: python refresh_transits.py
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}

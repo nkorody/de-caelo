@@ -1,10 +1,11 @@
 """
 De Caelo — shared transit window refresh.
 
-Standalone script, not an HTTP endpoint. Meant to run as a Render Cron Job
-(or any scheduler that can run "python refresh_transits.py" with the two
-env vars below set) — deliberately not reachable over the public internet,
-since the service-role key it holds bypasses Row Level Security entirely.
+Standalone script, not an HTTP endpoint. Run by the scheduled GitHub Actions
+workflow at .github/workflows/refresh-transits.yml (or any scheduler that
+can run "python refresh_transits.py" with the two env vars below set) —
+deliberately not reachable over the public internet, since the service-role
+key it holds bypasses Row Level Security entirely.
 Recomputes build_transits.py's calendar-only window and upserts it into
 Supabase's sky_snapshots singleton row (§4.2). Run on a slow cadence
 (monthly is plenty); the window itself only needs to move when window_end

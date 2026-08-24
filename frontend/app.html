@@ -1021,7 +1021,7 @@ function annotateTerms(text){
   return escaped.replace(GLOSSARY_REGEX, (m)=>{
     const def = GLOSSARY_LOWER[m.toLowerCase()];
     if(!def) return m;
-    return `<span class="term" tabindex="0">${m}<span class="term-tip">${escapeHtml(def)}</span></span>`;
+    return `<span class="term">${m}<span class="term-tip">${escapeHtml(def)}</span></span>`;
   });
 }
 
@@ -1030,8 +1030,10 @@ function renderOverview(container){
   const N = NATAL;
   const sun = N.points['Sun'], moon = N.points['Moon'], asc = N.points['Ascendant'];
   const wrap = el('div');
+  const birthHour12 = (N.birth.hour % 12) || 12;
+  const birthAmPm = N.birth.hour < 12 ? 'AM' : 'PM';
   wrap.appendChild(el('h2',{class:'section-title', text: window.USER_DISPLAY_NAME}));
-  wrap.appendChild(el('h2',{class:'section-title', text: N.birth.place + ', ' + N.birth.month+'/'+N.birth.day+'/'+N.birth.year + ', ' + N.birth.hour+':'+String(N.birth.minute).padStart(2,'0')}));
+  wrap.appendChild(el('h2',{class:'section-title', text: N.birth.place + ', ' + N.birth.month+'/'+N.birth.day+'/'+N.birth.year + ', ' + birthHour12+':'+String(N.birth.minute).padStart(2,'0')+' '+birthAmPm}));
   wrap.appendChild(ledeP(`${N.sect.light} above the horizon in the ${N.sect.sun_house}${ordSuf(N.sect.sun_house)} house: a ${N.sect.is_day?'day':'night'} chart.`));
 
   const bt = el('div',{class:'card'});

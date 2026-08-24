@@ -296,10 +296,14 @@ export default {
       }
       const reply = text;
 
-      await Promise.all([
-        supaInsert(env, user.jwt, 'chat_messages', { user_id: user.id, role: 'user', content: question }),
-        supaInsert(env, user.jwt, 'chat_messages', { user_id: user.id, role: 'assistant', content: reply }),
-      ]);
+      // Sequential, not Promise.all: created_at ordering has to match conversation
+      // order, since history is later reconstructed by sorting on it. Concurrent
+      // inserts don't guarantee which one the database timestamps first -- confirmed
+      // this really happens (assistant rows landing a few ms before the user row
+      // that prompted them), which corrupts history ordering and breaks Anthropic's
+      // strict user/assistant alternation requirement on the next question.
+      await supaInsert(env, user.jwt, 'chat_messages', { user_id: user.id, role: 'user', content: question });
+      await supaInsert(env, user.jwt, 'chat_messages', { user_id: user.id, role: 'assistant', content: reply });
 
       return jsonResponse({ reply }, 200, origin);
     } catch (e) {

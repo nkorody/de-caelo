@@ -27,6 +27,17 @@ MAX_PROGRESSION_AGE = 105
 _tf = TimezoneFinder()
 
 
+def _ensure_ephe_path():
+    # pyswisseph's ephemeris path is thread-local, not process-global: astro_engine.py's
+    # module-level swe.set_ephe_path() only takes effect in the thread that imported it.
+    # FastAPI runs sync endpoint functions in a worker-thread pool, so each request lands
+    # in a fresh thread that never called it — silently falls back to swisseph's compiled-in
+    # default search paths, which don't have our files, and fails with a "file not found"
+    # error that (confusingly) names those defaults, not our actual configured path. Cheap
+    # and idempotent, so just call it at the top of every entry point.
+    swe.set_ephe_path(EPHE_PATH)
+
+
 def resolve_utc_offset(year, month, day, hour, minute, lat, lon, utc_offset=None):
     if utc_offset is not None:
         return utc_offset
@@ -39,6 +50,7 @@ def resolve_utc_offset(year, month, day, hour, minute, lat, lon, utc_offset=None
 
 
 def compute_natal(birth: dict, utc_offset: float) -> tuple[dict, float]:
+    _ensure_ephe_path()
     jd_ut = jd_from_local(birth["year"], birth["month"], birth["day"], birth["hour"], birth["minute"], utc_offset)
 
     raw = {name: calc_body(jd_ut, code) for name, code in BODIES.items()}
@@ -172,6 +184,7 @@ def compute_natal(birth: dict, utc_offset: float) -> tuple[dict, float]:
 
 
 def compute_progressions(birth_jd: float, lat: float, lon: float) -> dict:
+    _ensure_ephe_path()
     offsets = list(range(0, MAX_PROGRESSION_AGE + 1))
     lon_table = {b: [] for b in PROG_BODIES}
     asc_table = []
@@ -189,6 +202,7 @@ def compute_progressions(birth_jd: float, lat: float, lon: float) -> dict:
 
 
 def compute_transits(start: datetime.date, end: datetime.date) -> dict:
+    _ensure_ephe_path()
     dates = []
     series = {b: [] for b in TRANSIT_BODIES}
     speed_series = {b: [] for b in TRANSIT_BODIES}

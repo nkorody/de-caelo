@@ -13,6 +13,16 @@
   --brass:#ffffff; --brass-dim:#5a5a5a; --brass-bright:#ffffff;
   --serif: "Helvetica Neue",Helvetica,Arial,system-ui,sans-serif;
   --mono: "IBM Plex Mono","JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  /* Spacing module (NASA Graphics Standards Manual, "The Grid -- What it is":
+     a predetermined understructure for margins, gutters, and placement,
+     applied consistently rather than picked per-element). One scale, used
+     for page margins, card padding, and grid gutters throughout -- not
+     retrofitted onto the Overview sky-grid/sidebar, whose spacing was
+     already hand-tuned and verified against real measured layout behavior
+     (see the sync/flex-shrink comments below) and isn't safe to reflow
+     against a different scale without re-verifying all of that. */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px;
+  --sp-6:32px; --sp-7:48px; --sp-8:64px; --sp-9:96px;
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;overflow-x:hidden;}
@@ -23,11 +33,11 @@ body{
   min-height:100vh;
 }
 #app{
-  max-width:1180px;margin:16px auto;padding:40px 34px 84px;
+  max-width:1180px;margin:16px auto;padding:var(--sp-7) var(--sp-7) var(--sp-9);
   border:3px solid var(--ink-4);
 }
 @media (max-width:640px){
-  #app{margin:0 auto;padding:20px 14px 56px;border-left:none;border-right:none;}
+  #app{margin:0 auto;padding:var(--sp-4) var(--sp-4) var(--sp-8);border-left:none;border-right:none;}
 }
 
 
@@ -58,21 +68,21 @@ body{
   color:var(--paper); font-weight:700; margin:0 0 8px;
 }
 h2.section-title{font-size:23px; font-weight:700; margin:0 0 4px; letter-spacing:0.02em; color:var(--paper); text-transform:uppercase;}
-p.lede{color:var(--paper-dim); font-size:15px; line-height:1.6; margin:0 0 22px; max-width:640px;}
+p.lede{color:var(--paper-dim); font-size:15px; line-height:1.6; margin:0 0 var(--sp-5); max-width:640px;}
 
 .card{
-  background:var(--ink); border:2px solid var(--ink-4); padding:18px 20px 20px; margin-bottom:16px;
+  background:var(--ink); border:2px solid var(--ink-4); padding:var(--sp-4); margin-bottom:var(--sp-4);
   position:relative;
 }
-.card-title{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; margin:0 0 12px; border-bottom:2px solid var(--ink-4); padding-bottom:8px;}
+.card-title{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; margin:0 0 var(--sp-3); border-bottom:2px solid var(--ink-4); padding-bottom:var(--sp-2);}
 
-.grid{display:grid; gap:14px;}
+.grid{display:grid; gap:var(--sp-4);}
 .grid-2{grid-template-columns:1fr 1fr;}
 .grid-3{grid-template-columns:repeat(3,1fr);}
 .grid-4{grid-template-columns:repeat(4,1fr);}
 @media (max-width:760px){ .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;} }
 
-.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:14px;}
+.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:var(--sp-4);}
 .table-wrap table{margin-bottom:0;}
 table{width:100%; border-collapse:collapse; font-size:15px;}
 th{
@@ -190,22 +200,26 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 
 .reading{font-size:15.5px; line-height:1.75; color:var(--paper-dim); margin:0 0 14px;}
 .reading:last-child{margin-bottom:0;}
+/* margin-bottom:0 -- every .reading-card now lives inside a .grid.grid-2
+   (see renderPlacements/renderAspectsPanel/renderFixedStars/renderLots),
+   so the grid's own gap is what spaces them, on both axes evenly; a margin
+   here too would just stack extra space onto the vertical gap only. */
 .reading-card{
-  background:var(--ink); padding:15px 20px 16px 22px; margin-bottom:12px; position:relative;
+  background:var(--ink); padding:var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-6); margin-bottom:0; position:relative;
   border-top:1px solid var(--ink-4); border-right:1px solid var(--ink-4); border-bottom:1px solid var(--ink-4);
 }
 .reading-card::before{
   content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--paper);
 }
-.reading-card .rc-head{font-family:var(--mono); font-size:12px; letter-spacing:0.04em; color:var(--paper); font-weight:700; margin-bottom:7px;}
+.reading-card .rc-head{font-family:var(--mono); font-size:12px; letter-spacing:0.04em; color:var(--paper); font-weight:700; margin-bottom:var(--sp-2);}
 .reading-card .rc-head .orb{color:var(--paper-faint); font-weight:normal;}
-details.more{margin-top:18px;}
-details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; cursor:pointer; padding:8px 0;}
+details.more{margin-top:var(--sp-4);}
+details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; color:var(--paper); font-weight:700; cursor:pointer; padding:var(--sp-2) 0;}
 
-.divider{display:flex; align-items:center; gap:12px; margin:28px 0 20px; opacity:0.9;}
+.divider{display:flex; align-items:center; gap:var(--sp-3); margin:var(--sp-6) 0 var(--sp-5); opacity:0.9;}
 .divider .line{flex:1; height:1px; background:var(--brass-dim);}
 
-.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:52px; line-height:1.7; border-top:3px solid var(--ink-4); padding-top:14px;}
+.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:var(--sp-7); line-height:1.7; border-top:3px solid var(--ink-4); padding-top:var(--sp-4);}
 
 .harm-select{display:flex; gap:8px; margin-bottom:16px;}
 .harm-btn{font-family:var(--mono); font-size:13px; padding:6px 14px; background:var(--ink); border:1px solid var(--ink-4); color:var(--paper-faint); cursor:pointer;}
@@ -1642,6 +1656,7 @@ function renderPlacements(container){
   wrap.appendChild(el('div',{class:'table-wrap'},[table]));
 
   wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
+  const readingsGrid = el('div',{class:'grid grid-2'});
   order.forEach(name=>{
     const p = NATAL.points[name];
     const text = INTERP.placements[name];
@@ -1649,8 +1664,9 @@ function renderPlacements(container){
     const card = el('div',{class:'reading-card', id:'reading-'+name.replace(/\s+/g,'-')});
     card.appendChild(el('div',{class:'rc-head', text:`${p.glyph?TXT(p.glyph):''}  ${name}  \u00b7  ${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}`}));
     card.appendChild(readingP(text));
-    wrap.appendChild(card);
+    readingsGrid.appendChild(card);
   });
+  wrap.appendChild(readingsGrid);
   container.appendChild(wrap);
 }
 
@@ -1663,12 +1679,14 @@ function renderAspectsPanel(container){
 
   const keyAspects = collectKeyAspects();
   wrap.appendChild(el('div',{class:'card-title', text:'Key Aspects'}));
+  const keyAspectsGrid = el('div',{class:'grid grid-2'});
   keyAspects.forEach(a=>{
     const card = el('div',{class:'reading-card'});
     card.appendChild(el('div',{class:'rc-head', html:`${a.p1} ${a.aspect} ${a.p2}  <span class="orb">orb ${a.orb.toFixed(2)}\u00b0</span>`}));
     card.appendChild(readingP(a.interp));
-    wrap.appendChild(card);
+    keyAspectsGrid.appendChild(card);
   });
+  wrap.appendChild(keyAspectsGrid);
 
   wrap.appendChild(divider());
   const details = el('details',{class:'more'});
@@ -1754,14 +1772,16 @@ function renderFixedStars(container){
   if(NATAL.fixed_stars.length===0){
     wrap.appendChild(ledeP('No conjunctions within orb.'));
   } else {
+    const starsGrid = el('div',{class:'grid grid-2'});
     [...NATAL.fixed_stars].sort((a,b)=>a.orb-b.orb).forEach(h=>{
       const key = h.point+'|'+h.star;
       const text = INTERP.fixedStars[key];
       const card = el('div',{class:'reading-card'});
       card.appendChild(el('div',{class:'rc-head', html:`${h.point} conjunct ${h.star}  <span class="orb">orb ${h.orb.toFixed(2)}\u00b0</span>`}));
       if(text) card.appendChild(readingP(text));
-      wrap.appendChild(card);
+      starsGrid.appendChild(card);
     });
+    wrap.appendChild(starsGrid);
   }
   container.appendChild(wrap);
 }
@@ -1793,14 +1813,16 @@ function renderLots(container){
   wrap.appendChild(el('div',{class:'table-wrap'},[table]));
 
   wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
+  const lotsGrid = el('div',{class:'grid grid-2'});
   Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
     const text = INTERP.arabicParts[name];
     if(!text) return;
     const card = el('div',{class:'reading-card', id:'lot-reading-'+name.replace(/\s+/g,'-')});
     card.appendChild(el('div',{class:'rc-head', text:`${name}  \u00b7  ${fmtPos(p)}, house ${p.house}`}));
     card.appendChild(readingP(text));
-    wrap.appendChild(card);
+    lotsGrid.appendChild(card);
   });
+  wrap.appendChild(lotsGrid);
   container.appendChild(wrap);
 }
 

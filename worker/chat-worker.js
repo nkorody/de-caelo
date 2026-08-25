@@ -276,13 +276,22 @@ export default {
           },
           body: JSON.stringify({
             model: 'claude-sonnet-5',
-            // Confirmed via live Worker logs: this model does extended thinking by
-            // default, and a "thinking" content block counts against max_tokens.
-            // At 700, thinking alone could consume the whole budget before any
-            // visible text was produced (stop_reason: max_tokens, empty thinking
-            // block, zero text blocks) -- not rare, reproduced on back-to-back
-            // requests. Raised well past a plausible thinking-pass length.
-            max_tokens: 4096,
+            // claude-sonnet-5 runs adaptive extended thinking by default -- there's
+            // no way to omit it into a no-thinking mode the way older models work,
+            // and a "thinking" content block counts against max_tokens. Raising
+            // max_tokens alone (700 -> 4096, an earlier fix) still left a real
+            // failure rate: thinking length is variable per request, so it could
+            // still consume the whole budget before any visible text, especially
+            // on an open-ended question (stop_reason: max_tokens, zero text
+            // blocks) -- reproduced live, not rare. output_config.effort:"low" is
+            // the documented lever for this (bounds thinking depth/spend directly,
+            // rather than betting max_tokens is high enough to outrun it) --
+            // appropriate here since the system prompt already asks for short,
+            // direct answers, not deep multi-step reasoning. max_tokens raised to
+            // 16000 (the documented non-streaming default) as headroom on top of
+            // that, not as the primary fix.
+            max_tokens: 16000,
+            output_config: { effort: 'low' },
             system: SYSTEM_PROMPT + '\n\n--- CHART AND CURRENT SKY DATA ---\n\n' + chartContext,
             messages,
           }),

@@ -1810,7 +1810,6 @@ function renderProgressions(container){
 let horoscopeState = { mode:'daily', date: null };
 function renderHoroscopePanel(container){
   const wrap = el('div');
-  wrap.appendChild(el('p',{class:'eyebrow', text:'Live Ephemeris'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Horoscope'}));
   wrap.appendChild(ledeP(`Generated from the actual transiting sky against your natal chart. Data runs ${AD.dateRange().start} to ${AD.dateRange().end}.`));
 

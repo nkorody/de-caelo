@@ -205,11 +205,8 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
    so the grid's own gap is what spaces them, on both axes evenly; a margin
    here too would just stack extra space onto the vertical gap only. */
 .reading-card{
-  background:var(--ink); padding:var(--sp-4) var(--sp-5) var(--sp-4) var(--sp-6); margin-bottom:0; position:relative;
-  border-top:1px solid var(--ink-4); border-right:1px solid var(--ink-4); border-bottom:1px solid var(--ink-4);
-}
-.reading-card::before{
-  content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--paper);
+  background:var(--ink); padding:var(--sp-4) var(--sp-5); margin-bottom:0; position:relative;
+  border:1px solid var(--ink-4);
 }
 .reading-card .rc-head{font-family:var(--mono); font-size:12px; letter-spacing:0.04em; color:var(--paper); font-weight:700; margin-bottom:var(--sp-2);}
 .reading-card .rc-head .orb{color:var(--paper-faint); font-weight:normal;}

@@ -15,7 +15,7 @@
   --mono: "IBM Plex Mono","JetBrains Mono",ui-monospace,"SF Mono",Menlo,Consolas,monospace;
 }
 *{box-sizing:border-box;}
-html,body{margin:0;padding:0;}
+html,body{margin:0;padding:0;overflow-x:hidden;}
 body{
   background:var(--ink);
   color:var(--paper);
@@ -26,15 +26,18 @@ body{
   max-width:1180px;margin:16px auto;padding:40px 34px 84px;
   border:3px solid var(--ink-4);
 }
+@media (max-width:640px){
+  #app{margin:0 auto;padding:20px 14px 56px;border-left:none;border-right:none;}
+}
 
 
 .tabs{
   display:flex; flex-wrap:nowrap; justify-content:center; gap:0; margin-bottom:0;
-  border-bottom:3px solid var(--ink-4); overflow-x:auto;
+  border-bottom:3px solid var(--ink-4); overflow-x:auto; -webkit-overflow-scrolling:touch;
 }
 .chart-subnav{
   display:flex; flex-wrap:nowrap; justify-content:center; gap:0; margin-bottom:24px;
-  border-bottom:3px solid var(--ink-4); overflow-x:auto;
+  border-bottom:3px solid var(--ink-4); overflow-x:auto; -webkit-overflow-scrolling:touch;
 }
 .chart-subnav .tab{ font-size:10.5px; }
 .tab{
@@ -69,12 +72,14 @@ p.lede{color:var(--paper-dim); font-size:15px; line-height:1.6; margin:0 0 22px;
 .grid-4{grid-template-columns:repeat(4,1fr);}
 @media (max-width:760px){ .grid-2,.grid-3,.grid-4{grid-template-columns:1fr;} }
 
+.table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:14px;}
+.table-wrap table{margin-bottom:0;}
 table{width:100%; border-collapse:collapse; font-size:15px;}
 th{
   font-family:var(--mono); font-size:11px; letter-spacing:0.06em; text-transform:uppercase;
-  color:var(--paper); text-align:left; padding:6px 10px; border-bottom:2px solid var(--ink-4);
+  color:var(--paper); text-align:left; padding:6px 10px; border-bottom:2px solid var(--ink-4); white-space:nowrap;
 }
-td{padding:7px 10px; border-bottom:1px solid var(--brass-dim); color:var(--paper-dim);}
+td{padding:7px 10px; border-bottom:1px solid var(--brass-dim); color:var(--paper-dim); white-space:nowrap;}
 tr:hover td{color:var(--ink); background:var(--paper);}
 td.glyph{font-size:17px; color:var(--paper); width:28px;}
 td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
@@ -109,8 +114,11 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .sky-panel{position:relative;}
 .sky-info-box{position:absolute; top:10px; right:10px; border:2px solid var(--ink-4); background:rgba(0,0,0,0.7); padding:9px 13px; font-family:var(--mono); font-size:11px; line-height:1.6; color:var(--paper-dim); max-width:220px;}
 .sky-info-box b{color:var(--paper); display:block; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:3px;}
-.planet-quickview{display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 18px;}
-.pqv-btn{width:34px; height:34px; border:1.5px solid var(--ink-4); background:var(--ink); color:var(--paper); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:serif; padding:0;}
+@media (max-width:480px){
+  .sky-info-box{top:6px; right:6px; padding:6px 8px; font-size:9.5px; max-width:130px;}
+}
+.planet-quickview{display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin:14px 0 18px;}
+.pqv-btn{width:100%; aspect-ratio:1; border:1.5px solid var(--ink-4); background:var(--ink); color:var(--paper); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:serif; padding:0;}
 .pqv-btn:hover{border-color:var(--paper-dim);}
 .pqv-btn.active{border-color:var(--paper); background:var(--paper); color:var(--ink);}
 .sky-focus-card{min-height:96px;}
@@ -858,53 +866,8 @@ function skyProject(az, alt, R, cx, cy){
   return [cx - r*Math.sin(theta), cy - r*Math.cos(theta)];
 }
 const SKY_BODIES = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
-const ZODIAC_ABBR = {Ari:'Aries',Tau:'Taurus',Gem:'Gemini',Cnc:'Cancer',Leo:'Leo',Vir:'Virgo',Lib:'Libra',Sco:'Scorpius',Sgr:'Sagittarius',Cap:'Capricornus',Aqr:'Aquarius',Psc:'Pisces'};
-// astrological sign name (as it appears on natal.points[*].sign) -> zodiac-figures.json key.
-// Differs from ZODIAC_ABBR's constellation names for Scorpio/Capricorn specifically.
-const SIGN_TO_ABBR = {Aries:'Ari',Taurus:'Tau',Gemini:'Gem',Cancer:'Cnc',Leo:'Leo',Virgo:'Vir',Libra:'Lib',Scorpio:'Sco',Sagittarius:'Sgr',Capricorn:'Cap',Aquarius:'Aqr',Pisces:'Psc'};
 
-// Flat local-tangent-plane template for a sign's creature: delta-RA/delta-Dec
-// from its own centroid, in raw degrees (a small-angle approximation, not a
-// true projection -- deliberately, since this shape gets stamped at a
-// planet's screen position afterward, not projected from a real sky
-// position; see the note at zodiacGhostLayer in buildSkySVG for why).
-function zodiacGhostPaths(signName, targetRadius){
-  const abbr = SIGN_TO_ABBR[signName];
-  const strokes = (window.ZODIAC_FIGURES||{})[abbr];
-  if(!strokes) return '';
-  const allPts = strokes.flat();
-  let sinSum=0, cosSum=0, decSum=0;
-  allPts.forEach(([raDeg,dec])=>{ sinSum+=Math.sin(raDeg*D2R); cosSum+=Math.cos(raDeg*D2R); decSum+=dec; });
-  const centroidRa = Math.atan2(sinSum,cosSum)*R2D;
-  const centroidDec = decSum/allPts.length;
-  // Normalize to a consistent on-screen size regardless of the sign's actual
-  // angular extent (Cancer's few, spread-out stars vs. Taurus's tight
-  // cluster would otherwise render at wildly different sizes at a fixed
-  // px-per-degree). Find the farthest point from centroid, scale so that
-  // reaches targetRadius.
-  let maxR = 0.001;
-  allPts.forEach(([raDeg,dec])=>{
-    let dRa = raDeg - centroidRa;
-    if(dRa > 180) dRa -= 360; if(dRa < -180) dRa += 360;
-    const dDec = dec - centroidDec;
-    maxR = Math.max(maxR, Math.hypot(dRa, dDec));
-  });
-  const scale = targetRadius / maxR;
-  let paths = '';
-  strokes.forEach(stroke=>{
-    let d = '';
-    stroke.forEach(([raDeg,dec],i)=>{
-      let dRa = raDeg - centroidRa;
-      if(dRa > 180) dRa -= 360; if(dRa < -180) dRa += 360;
-      const x = -dRa*scale, y = -(dec-centroidDec)*scale; // RA increases eastward (leftward in this mirrored view); Dec increases "up"
-      d += (i===0) ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
-    });
-    paths += `<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
-  });
-  return paths;
-}
-
-function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
+function buildSkySVG(natal, stars, constLines, size){
   const R = size/2 - 6, cx = size/2, cy = size/2;
   const lst = lstDegrees(natal.jd_ut, natal.birth.lon);
   const lat = natal.birth.lat;
@@ -922,16 +885,6 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
       <feGaussianBlur stdDeviation="4.5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
-    <filter id="ghostGlow" x="-80%" y="-80%" width="260%" height="260%">
-      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="wide"/>
-      <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="core"/>
-      <feMerge><feMergeNode in="wide"/><feMergeNode in="wide"/><feMergeNode in="core"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <radialGradient id="ghostHaze" cx="50%" cy="50%" r="50%">
-      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
-      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.16"/>
-      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
-    </radialGradient>
   </defs>`);
   svg.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#skyBg)" stroke="${WC.brassDim}" stroke-width="1"/>`);
 
@@ -941,11 +894,9 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
     svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="monospace" letter-spacing="2" fill="${WC.brassDim}">${label}</text>`);
   });
 
-  // constellation figures: plain connect-the-dot for all, extra pictorial
-  // strokes layered in (very low opacity, "atmospheric") for the zodiac only
+  // constellation figures: plain connect-the-dot for all constellations.
   const conStarPos = {}; // con abbr -> list of projected [x,y,alt]
   (constLines.features||[]).forEach(feat=>{
-    const abbr = feat.id;
     (feat.geometry.coordinates||[]).forEach(line=>{
       let d = '';
       line.forEach(([raDeg,dec],i)=>{
@@ -957,32 +908,6 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
       if(d) svg.push(`<path d="${d}" fill="none" stroke="${WC.brassDim}" stroke-width="0.5" opacity="0.35"/>`);
     });
   });
-  Object.keys(ZODIAC_ABBR).forEach(abbr=>{
-    const strokes = zodiacFigures[abbr];
-    if(!strokes) return;
-    strokes.forEach(stroke=>{
-      let d = '';
-      stroke.forEach(([raDeg,dec],i)=>{
-        const {alt,az} = raDecToAltAz(raDeg, dec, lat, lst);
-        const [x,y] = skyProject(az, alt, R, cx, cy);
-        d += (i===0) ? `M${x.toFixed(1)},${y.toFixed(1)}` : `Q${x.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
-      });
-      if(d) svg.push(`<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="0.6" opacity="0.12"/>`);
-    });
-  });
-
-  // "Ghost" figure group: populated dynamically at selection time (see
-  // zodiacGhostPaths()/showZodiacGhost() below), anchored at the *selected
-  // planet's* own screen position rather than the real sky position of the
-  // same-named constellation. Those are genuinely different things -- a
-  // planet's tropical sign and the physical constellation with the same
-  // name can be nowhere near each other at a given moment (here, Cancer
-  // the constellation sits well below the horizon at this exact birth
-  // moment even though the Ascendant is astrologically in Cancer), so
-  // anchoring to the constellation's real position is both geometrically
-  // degenerate near/below the horizon and conceptually the wrong claim
-  // for what this is annotating.
-  svg.push(`<g id="zodiacGhostLayer"></g>`);
 
   // stars, brightest last so they layer on top
   const projectedStars = stars.map(([raDeg,dec,mag,name,con])=>{
@@ -1330,8 +1255,8 @@ function renderOverview(container){
   sidebar.appendChild(el('div',{class:'eyebrow', style:'margin-top:16px;', text:'Planet Quick View'}));
   const pqv = el('div',{class:'planet-quickview', id:'planetQuickView'});
   SKY_BODIES.forEach(name=>{
-    const p = N.points[name];
-    const btn = el('button',{class:'pqv-btn', text: p.glyph?TXT(p.glyph):name[0]});
+    const glyph = BODY_GLYPH[name];
+    const btn = el('button',{class:'pqv-btn', text: glyph?TXT(glyph):name[0]});
     btn.dataset.name = name;
     btn.title = name;
     pqv.appendChild(btn);
@@ -1350,7 +1275,7 @@ function renderOverview(container){
   // ---------- sky panel ----------
   const panel = el('div',{class:'sky-panel'});
   const skySize = 720;
-  panel.innerHTML = buildSkySVG(N, window.STAR_DATA||[], window.CONSTELLATION_LINES||{features:[]}, window.ZODIAC_FIGURES||{}, skySize);
+  panel.innerHTML = buildSkySVG(N, window.STAR_DATA||[], window.CONSTELLATION_LINES||{features:[]}, skySize);
   const infoBox = el('div',{class:'sky-info-box'});
   infoBox.innerHTML = `<b>Your Sky</b>${dateStr}, ${timeStr}<br>${N.birth.place}`;
   panel.appendChild(infoBox);
@@ -1358,26 +1283,6 @@ function renderOverview(container){
 
   wrap.appendChild(grid);
   container.appendChild(wrap);
-
-  const ghostLayer = panel.querySelector('#zodiacGhostLayer');
-  function showZodiacGhost(sign){
-    // Not tied to any real position (a planet's tropical sign and the real
-    // sky position of the same-named constellation are different things --
-    // see the note at zodiacGhostLayer in buildSkySVG). Centered instead:
-    // a large, atmospheric presence behind the actual star data, not a
-    // small badge pinned to the planet's own marker.
-    const paths = zodiacGhostPaths(sign, 175);
-    if(!paths) return;
-    const mid = skySize/2;
-    const haze = `<circle cx="0" cy="0" r="190" fill="url(#ghostHaze)"/>`;
-    // Set via innerHTML, not createElement/appendChild: SVG elements need the
-    // SVG namespace, which plain document.createElement doesn't give them --
-    // assigning markup to an SVG-namespaced parent's innerHTML parses it
-    // correctly, same trick already used for the rest of the sky SVG.
-    ghostLayer.innerHTML = `<g transform="translate(${mid},${mid})" opacity="0" filter="url(#ghostGlow)">${haze}${paths}</g>`;
-    const g = ghostLayer.firstElementChild;
-    requestAnimationFrame(()=>{ g.style.transition = 'opacity .8s ease'; g.style.opacity = '0.6'; });
-  }
 
   function renderFocusCard(type, name){
     const p = N.points[name];
@@ -1391,7 +1296,6 @@ function renderOverview(container){
       focusCard.appendChild(ledeP(`${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}.`));
     }
     [...pqv.children].forEach(b=>b.classList.toggle('active', b.dataset.name===name));
-    if(p.sign) showZodiacGhost(p.sign);
   }
 
   const skyCtl = wireSkyInteraction(panel, N, (type,name)=>renderFocusCard(type,name));
@@ -1551,7 +1455,7 @@ function renderPlacements(container){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  wrap.appendChild(table);
+  wrap.appendChild(el('div',{class:'table-wrap'},[table]));
 
   wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
   order.forEach(name=>{
@@ -1600,7 +1504,7 @@ function renderAspectsPanel(container){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  details.appendChild(table);
+  details.appendChild(el('div',{class:'table-wrap'},[table]));
   wrap.appendChild(details);
   container.appendChild(wrap);
 }
@@ -1630,7 +1534,7 @@ function renderDignities(container){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  wrap.appendChild(table);
+  wrap.appendChild(el('div',{class:'table-wrap'},[table]));
   container.appendChild(wrap);
 }
 
@@ -1702,7 +1606,7 @@ function renderLots(container){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  wrap.appendChild(table);
+  wrap.appendChild(el('div',{class:'table-wrap'},[table]));
 
   wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Readings'}));
   Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
@@ -1759,7 +1663,7 @@ function renderHarmonicBody(body, h){
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
-  body.appendChild(table);
+  body.appendChild(el('div',{class:'table-wrap'},[table]));
   const asps = [...data.aspects].filter(a=>a.orb<1.5).sort((a,b)=>a.orb-b.orb).slice(0,16);
   if(asps.length){
     const card = el('div',{class:'card', style:'margin-top:14px;'});
@@ -1801,7 +1705,7 @@ function renderProgressions(container){
     tb1.appendChild(tr);
   });
   t1.appendChild(tb1);
-  card1.appendChild(t1);
+  card1.appendChild(el('div',{class:'table-wrap'},[t1]));
   wrap.appendChild(card1);
 
   const progAspects = transitAspects(positions, AD.natalLons, {fast:1.5,personal:1.5,social:1.5,outer:1.5})
@@ -2004,13 +1908,12 @@ function initApp(){
   if(!session){ location.href = 'login.html'; return; }
 
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }, starsRes, constLinesRes, zodiacFiguresRes] = await Promise.all([
+  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }, starsRes, constLinesRes] = await Promise.all([
     supabase.from('charts').select('natal_json,prog_json').eq('user_id', user.id).maybeSingle(),
     supabase.from('sky_snapshots').select('transit_json').eq('id', 1).maybeSingle(),
     supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
     fetch('stars.json').then(r=>r.json()),
     fetch('constellation-lines.json').then(r=>r.json()),
-    fetch('zodiac-figures.json').then(r=>r.json()),
   ]);
 
   if(chartErr || !chart){ location.href = 'onboarding.html'; return; }
@@ -2025,7 +1928,6 @@ function initApp(){
   window.USER_DISPLAY_NAME = (profile && profile.display_name) || (user.email ? user.email.split('@')[0] : 'Your Chart');
   window.STAR_DATA = starsRes;
   window.CONSTELLATION_LINES = constLinesRes;
-  window.ZODIAC_FIGURES = zodiacFiguresRes;
 
   loadingScreen.style.display = 'none';
   appEl.style.display = '';

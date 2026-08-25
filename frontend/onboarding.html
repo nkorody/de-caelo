@@ -13,7 +13,8 @@
   .manual-toggle{font-family:var(--mono); font-size:11px; color:var(--paper-faint); cursor:pointer; text-decoration:underline; margin:-4px 0 4px;}
   .manual-fields{display:none; gap:12px;}
   .manual-fields.show{display:flex;}
-  .manual-fields input{flex:1;}
+  .manual-fields input{flex:1; min-width:0;}
+  @media (max-width:380px){ .manual-fields.show{flex-direction:column;} }
   .computing{display:none; text-align:center;}
   .computing .eyebrow{margin-bottom:14px;}
   .computing p{font-size:14px; color:var(--paper-dim); line-height:1.6; margin:14px 0 0;}

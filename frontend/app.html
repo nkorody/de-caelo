@@ -29,9 +29,14 @@ body{
 
 
 .tabs{
-  display:flex; flex-wrap:nowrap; gap:0; margin-bottom:24px;
+  display:flex; flex-wrap:nowrap; justify-content:center; gap:0; margin-bottom:0;
   border-bottom:3px solid var(--ink-4); overflow-x:auto;
 }
+.chart-subnav{
+  display:flex; flex-wrap:nowrap; justify-content:center; gap:0; margin-bottom:24px;
+  border-bottom:3px solid var(--ink-4); overflow-x:auto;
+}
+.chart-subnav .tab{ font-size:10.5px; }
 .tab{
   font-family:var(--mono); font-size:11px; letter-spacing:0.03em; text-transform:uppercase;
   color:var(--paper-faint); background:transparent; border:none; border-bottom:3px solid transparent;
@@ -97,6 +102,21 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .bar-fill{height:100%; background:var(--paper);}
 .bar-row .count{width:20px; text-align:right; color:var(--paper-dim);}
 
+.sky-grid{display:grid; grid-template-columns:300px 1fr; gap:28px; align-items:start;}
+@media (max-width:860px){ .sky-grid{grid-template-columns:1fr;} }
+.sky-sidebar .birth-block{margin-bottom:18px;}
+.sky-sidebar .birth-block .coords{font-family:var(--mono); font-size:12px; color:var(--paper-faint); margin-top:2px;}
+.sky-panel{position:relative;}
+.sky-info-box{position:absolute; top:10px; right:10px; border:2px solid var(--ink-4); background:rgba(0,0,0,0.7); padding:9px 13px; font-family:var(--mono); font-size:11px; line-height:1.6; color:var(--paper-dim); max-width:220px;}
+.sky-info-box b{color:var(--paper); display:block; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:3px;}
+.planet-quickview{display:flex; gap:6px; flex-wrap:wrap; margin:14px 0 18px;}
+.pqv-btn{width:34px; height:34px; border:1.5px solid var(--ink-4); background:var(--ink); color:var(--paper); cursor:pointer; display:flex; align-items:center; justify-content:center; font-size:16px; font-family:serif; padding:0;}
+.pqv-btn:hover{border-color:var(--paper-dim);}
+.pqv-btn.active{border-color:var(--paper); background:var(--paper); color:var(--ink);}
+.sky-focus-card{min-height:96px;}
+.view-full-chart{display:block; text-align:center; margin-top:18px; font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; padding:12px; border:2px solid var(--paper); color:var(--paper); background:transparent; cursor:pointer; font-weight:700; text-decoration:none;}
+.view-full-chart:hover{background:var(--paper); color:var(--ink);}
+.sky-obj{cursor:pointer;}
 .wheel-wrap{display:flex; justify-content:center; padding:10px 0 14px; position:relative;}
 .wheel-wrap svg{max-width:100%; height:auto;}
 .wheel-planet{cursor:help;}
@@ -178,6 +198,7 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 <div id="app" style="display:none;">
   <button id="oracleToggle" class="oracle-fab">Ask &#8599;</button>
   <div class="tabs" id="tabs"></div>
+  <div class="chart-subnav" id="chartSubnav" style="display:none;"></div>
   <div id="panels"></div>
   <div class="footnote">
     Positions from the Swiss Ephemeris (JPL DE-derived), including the full fixed-star catalog. Transit and horoscope data run 2024 to 2034 daily. Progressions and solar arc compute live for any date, age 0 to 105, using the day-for-a-year method. Houses are Placidus, with whole-sign shown alongside. Reload periodically to extend the transit window past 2034.
@@ -800,6 +821,181 @@ function buildWheelSVG(natal){
   return svg.join('');
 }
 
+// ---------- SKY VISUALIZER ----------
+// Every planet/angle position comes from natal.points[*].az/.alt, computed
+// server-side by ephemeris-service via swe.azalt() -- same source of truth
+// as the Wheel/Placements tabs, no second astronomy engine. The one thing
+// that's genuinely new here: converting the star catalogue's fixed RA/Dec
+// into Alt/Az for this observer at this moment. Standard spherical
+// astronomy (Local Sidereal Time, then the equatorial-to-horizontal
+// formula, Meeus's south-based-azimuth form), not planetary theory.
+const D2R = Math.PI/180, R2D = 180/Math.PI;
+function gmstDegrees(jd_ut){
+  const T = (jd_ut - 2451545.0) / 36525.0;
+  return norm360(280.46061837 + 360.98564736629*(jd_ut - 2451545.0) + 0.000387933*T*T - (T*T*T)/38710000.0);
+}
+function lstDegrees(jd_ut, observerLonDeg){ return norm360(gmstDegrees(jd_ut) + observerLonDeg); }
+function raDecToAltAz(raDeg, decDeg, latDeg, lstDeg){
+  const H = D2R * norm360(lstDeg - raDeg);
+  const lat = D2R*latDeg, dec = D2R*decDeg;
+  const sinAlt = Math.sin(lat)*Math.sin(dec) + Math.cos(lat)*Math.cos(dec)*Math.cos(H);
+  const alt = Math.asin(Math.max(-1,Math.min(1,sinAlt))) * R2D;
+  // Meeus's form: azimuth from South, positive westward -- same convention
+  // swe.azalt() returns server-side, converted the same way below, so both
+  // pipelines agree on North=0/East=90 before anything gets drawn.
+  const azSW = Math.atan2(Math.sin(H), Math.cos(H)*Math.sin(lat) - Math.tan(dec)*Math.cos(lat)) * R2D;
+  return { alt, az: norm360(azSW + 180) };
+}
+// Zenith-centered stereographic projection, horizon (alt=0) at the boundary
+// circle, zenith (alt=90) at the center. North at top, mirrored left/right
+// (East on the left): the standard convention for a chart meant to be held
+// overhead and matched against the real sky, not read like a ground map.
+function skyProject(az, alt, R, cx, cy){
+  const r = R * Math.tan((90-alt)*D2R/2);
+  const theta = az*D2R;
+  return [cx - r*Math.sin(theta), cy - r*Math.cos(theta)];
+}
+const SKY_BODIES = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
+const ZODIAC_ABBR = {Ari:'Aries',Tau:'Taurus',Gem:'Gemini',Cnc:'Cancer',Leo:'Leo',Vir:'Virgo',Lib:'Libra',Sco:'Scorpius',Sgr:'Sagittarius',Cap:'Capricornus',Aqr:'Aquarius',Psc:'Pisces'};
+
+function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
+  const R = size/2 - 6, cx = size/2, cy = size/2;
+  const lst = lstDegrees(natal.jd_ut, natal.birth.lon);
+  const lat = natal.birth.lat;
+  const svg = [];
+  svg.push(`<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:auto;" id="skySvgRoot">`);
+  svg.push(`<defs>
+    <radialGradient id="skyBg" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0a0a12"/><stop offset="75%" stop-color="#020204"/><stop offset="100%" stop-color="#000000"/>
+    </radialGradient>
+    <filter id="starGlow" x="-200%" y="-200%" width="500%" height="500%">
+      <feGaussianBlur stdDeviation="2.2" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="bodyGlow" x="-300%" y="-300%" width="700%" height="700%">
+      <feGaussianBlur stdDeviation="4.5" result="blur"/>
+      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>`);
+  svg.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#skyBg)" stroke="${WC.brassDim}" stroke-width="1"/>`);
+
+  // cardinal labels around the horizon boundary
+  [['N',0],['E',90],['S',180],['W',270]].forEach(([label,az])=>{
+    const [lx,ly] = skyProject(az, -3, R+14, cx, cy);
+    svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="11" font-family="monospace" letter-spacing="2" fill="${WC.brassDim}">${label}</text>`);
+  });
+
+  // constellation figures: plain connect-the-dot for all, extra pictorial
+  // strokes layered in (very low opacity, "atmospheric") for the zodiac only
+  const conStarPos = {}; // con abbr -> list of projected [x,y,alt]
+  (constLines.features||[]).forEach(feat=>{
+    const abbr = feat.id;
+    (feat.geometry.coordinates||[]).forEach(line=>{
+      let d = '';
+      line.forEach(([raDeg,dec],i)=>{
+        const {alt,az} = raDecToAltAz(raDeg, dec, lat, lst);
+        if(alt < -8) { d += ''; return; }
+        const [x,y] = skyProject(az, alt, R, cx, cy);
+        d += (i===0||d==='') ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      if(d) svg.push(`<path d="${d}" fill="none" stroke="${WC.brassDim}" stroke-width="0.5" opacity="0.35"/>`);
+    });
+  });
+  Object.keys(ZODIAC_ABBR).forEach(abbr=>{
+    const strokes = zodiacFigures[abbr];
+    if(!strokes) return;
+    strokes.forEach(stroke=>{
+      let d = '';
+      stroke.forEach(([raDeg,dec],i)=>{
+        const {alt,az} = raDecToAltAz(raDeg, dec, lat, lst);
+        const [x,y] = skyProject(az, alt, R, cx, cy);
+        d += (i===0) ? `M${x.toFixed(1)},${y.toFixed(1)}` : `Q${x.toFixed(1)},${y.toFixed(1)} ${x.toFixed(1)},${y.toFixed(1)}`;
+      });
+      if(d) svg.push(`<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="0.6" opacity="0.12"/>`);
+    });
+  });
+
+  // stars, brightest last so they layer on top
+  const projectedStars = stars.map(([raDeg,dec,mag,name,con])=>{
+    const {alt,az} = raDecToAltAz(raDeg, dec, lat, lst);
+    return {alt, az, mag, name, con};
+  }).filter(s=>s.alt > -8).sort((a,b)=>b.mag-a.mag);
+  projectedStars.forEach(s=>{
+    const [x,y] = skyProject(s.az, s.alt, R, cx, cy);
+    const t = Math.max(0, Math.min(1, (4.5 - s.mag) / 6));
+    const rad = (0.4 + t*1.8).toFixed(2);
+    const op = (0.45 + t*0.55).toFixed(2);
+    const glow = s.mag < 1.6 ? ' filter="url(#starGlow)"' : '';
+    svg.push(`<circle class="sky-star" data-name="${escapeHtml(s.name||s.con)}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${rad}" fill="${WC.paper}" opacity="${op}"${glow}/>`);
+  });
+
+  // Ascendant / Midheaven
+  [['Ascendant','ASC'],['Midheaven','MC']].forEach(([name,label])=>{
+    const p = natal.points[name];
+    if(!p || p.alt < -10) return;
+    const [x,y] = skyProject(p.az, Math.max(p.alt,-8), R, cx, cy);
+    svg.push(`<g class="sky-obj" data-type="angle" data-name="${name}" tabindex="0">`);
+    svg.push(`<circle class="so-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="14" fill="none" stroke="${WC.redBright}" stroke-width="0"/>`);
+    svg.push(`<line x1="${x.toFixed(1)}" y1="${(y-7).toFixed(1)}" x2="${x.toFixed(1)}" y2="${(y+7).toFixed(1)}" stroke="${WC.red}" stroke-width="1.4"/>`);
+    svg.push(`<line x1="${(x-7).toFixed(1)}" y1="${y.toFixed(1)}" x2="${(x+7).toFixed(1)}" y2="${y.toFixed(1)}" stroke="${WC.red}" stroke-width="1.4"/>`);
+    svg.push(`<text x="${x.toFixed(1)}" y="${(y-13).toFixed(1)}" text-anchor="middle" font-size="10" font-family="monospace" fill="${WC.redBright}">${label}</text>`);
+    svg.push(`</g>`);
+  });
+
+  // planets
+  SKY_BODIES.forEach(name=>{
+    const p = natal.points[name];
+    if(!p || p.alt < -8) return;
+    const [x,y] = skyProject(p.az, p.alt, R, cx, cy);
+    svg.push(`<g class="sky-obj" data-type="planet" data-name="${name}" tabindex="0">`);
+    svg.push(`<circle class="so-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="none" stroke="${WC.paper}" stroke-width="0"/>`);
+    svg.push(`<circle class="so-body" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${WC.paper}" filter="url(#bodyGlow)"/>`);
+    svg.push(`<text class="so-label" x="${x.toFixed(1)}" y="${(y-10).toFixed(1)}" text-anchor="middle" font-size="10.5" font-family="monospace" letter-spacing="1" fill="${WC.paper}" opacity="0">${name.toUpperCase()}</text>`);
+    svg.push(`</g>`);
+  });
+
+  svg.push(`</svg>`);
+  return svg.join('');
+}
+
+// interaction: hover brightens + labels + updates sidebar; click selects and persists
+function wireSkyInteraction(container, natal, onSelect){
+  let selected = null;
+  function setLabel(g, show){
+    const label = g.querySelector('.so-label');
+    if(label) label.setAttribute('opacity', show?'1':'0');
+    const halo = g.querySelector('.so-halo');
+    if(halo) halo.setAttribute('stroke-width', show?'1.6':'0');
+    if(halo) halo.setAttribute('opacity', show?'0.8':'0');
+    const body = g.querySelector('.so-body');
+    if(body) body.setAttribute('r', show?'5.5':'4');
+  }
+  container.addEventListener('mouseover', e=>{
+    const g = e.target.closest('.sky-obj');
+    if(g && g !== selected) setLabel(g, true);
+  });
+  container.addEventListener('mouseout', e=>{
+    const g = e.target.closest('.sky-obj');
+    if(g && g !== selected) setLabel(g, false);
+  });
+  container.addEventListener('click', e=>{
+    const g = e.target.closest('.sky-obj');
+    if(!g) return;
+    selectByName(g.dataset.type, g.dataset.name);
+  });
+  // Selection can be driven by something with no on-screen marker (a planet
+  // below the horizon at birth has no sky-obj group to click), so selection
+  // state and the onSelect callback don't depend on the DOM element existing.
+  function selectByName(type, name){
+    if(selected) setLabel(selected, false);
+    const g = container.querySelector(`.sky-obj[data-name="${name}"]`);
+    selected = g || null;
+    if(g) setLabel(g, true);
+    onSelect(type, name);
+  }
+  return { selectByName };
+}
+
 </script>
 <script>
 const INTERP = {
@@ -1032,9 +1228,22 @@ function renderOverview(container){
   const wrap = el('div');
   const birthHour12 = (N.birth.hour % 12) || 12;
   const birthAmPm = N.birth.hour < 12 ? 'AM' : 'PM';
-  wrap.appendChild(el('h2',{class:'section-title', text: window.USER_DISPLAY_NAME}));
-  wrap.appendChild(el('h2',{class:'section-title', text: N.birth.place + ', ' + N.birth.month+'/'+N.birth.day+'/'+N.birth.year + ', ' + birthHour12+':'+String(N.birth.minute).padStart(2,'0')+' '+birthAmPm}));
-  wrap.appendChild(ledeP(`${N.sect.light} above the horizon in the ${N.sect.sun_house}${ordSuf(N.sect.sun_house)} house: a ${N.sect.is_day?'day':'night'} chart.`));
+  const timeStr = `${birthHour12}:${String(N.birth.minute).padStart(2,'0')} ${birthAmPm}`;
+  const dateStr = `${N.birth.month}/${N.birth.day}/${N.birth.year}`;
+  const latAbs = Math.abs(N.birth.lat).toFixed(4), lonAbs = Math.abs(N.birth.lon).toFixed(4);
+  const coordStr = `${latAbs}\u00b0 ${N.birth.lat>=0?'N':'S'}, ${lonAbs}\u00b0 ${N.birth.lon>=0?'E':'W'}`;
+
+  const grid = el('div',{class:'sky-grid'});
+
+  // ---------- sidebar ----------
+  const sidebar = el('div',{class:'sky-sidebar'});
+
+  const birthBlock = el('div',{class:'birth-block'});
+  birthBlock.appendChild(el('h2',{class:'section-title', style:'font-size:19px;', text: window.USER_DISPLAY_NAME}));
+  birthBlock.appendChild(el('div',{class:'lede', style:'margin:2px 0 0; font-size:13px;', text: N.birth.place}));
+  birthBlock.appendChild(el('div',{class:'coords', text: `${dateStr}, ${timeStr}`}));
+  birthBlock.appendChild(el('div',{class:'coords', text: coordStr}));
+  sidebar.appendChild(birthBlock);
 
   const bt = el('div',{class:'card'});
   bt.appendChild(el('div',{class:'card-title', text:'The Big Three'}));
@@ -1047,53 +1256,62 @@ function renderOverview(container){
     row.appendChild(item);
   });
   bt.appendChild(row);
-  wrap.appendChild(bt);
+  sidebar.appendChild(bt);
 
-  const grid = el('div',{class:'grid grid-2'});
-
-  const chartRuler = el('div',{class:'card'});
-  chartRuler.appendChild(el('div',{class:'card-title', text:'Chart Ruler & Sect'}));
-  chartRuler.appendChild(el('p',{class:'lede', style:'margin-bottom:6px', html:
-    `Ascendant in <b>${N.chart_ruler.asc_sign}</b>, ruled by <b>${N.chart_ruler.modern}</b>` +
-    (N.chart_ruler.modern!==N.chart_ruler.traditional ? ` (traditional: ${N.chart_ruler.traditional})` : '') + `.<br>` +
-    `Sect light: <b>${N.sect.light}</b>. The ${N.sect.is_day?'diurnal':'nocturnal'} sect governs which planets are dignified by triplicity.`
-  }));
-  grid.appendChild(chartRuler);
-
-  const balCard = el('div',{class:'card'});
-  balCard.appendChild(el('div',{class:'card-title', text:'Element & Modality Balance'}));
-  const elems = N.balance.elements, mods = N.balance.modalities;
-  const maxE = Math.max(...Object.values(elems)), maxM = Math.max(...Object.values(mods));
-  Object.keys(elems).forEach(k=>{
-    const r = el('div',{class:'bar-row'});
-    r.appendChild(el('div',{class:'label', text:k}));
-    const track = el('div',{class:'bar-track'});
-    track.appendChild(el('div',{class:'bar-fill', style:`width:${(elems[k]/maxE*100)}%`}));
-    r.appendChild(track);
-    r.appendChild(el('div',{class:'count', text:elems[k]}));
-    balCard.appendChild(r);
+  sidebar.appendChild(el('div',{class:'eyebrow', style:'margin-top:16px;', text:'Planet Quick View'}));
+  const pqv = el('div',{class:'planet-quickview', id:'planetQuickView'});
+  SKY_BODIES.forEach(name=>{
+    const p = N.points[name];
+    const btn = el('button',{class:'pqv-btn', text: p.glyph?TXT(p.glyph):name[0]});
+    btn.dataset.name = name;
+    btn.title = name;
+    pqv.appendChild(btn);
   });
-  balCard.appendChild(el('div',{style:'height:8px'}));
-  Object.keys(mods).forEach(k=>{
-    const r = el('div',{class:'bar-row'});
-    r.appendChild(el('div',{class:'label', text:k}));
-    const track = el('div',{class:'bar-track'});
-    track.appendChild(el('div',{class:'bar-fill', style:`width:${(mods[k]/maxM*100)}%; background:var(--verdigris)`}));
-    r.appendChild(track);
-    r.appendChild(el('div',{class:'count', text:mods[k]}));
-    balCard.appendChild(r);
-  });
-  grid.appendChild(balCard);
+  sidebar.appendChild(pqv);
+
+  const focusCard = el('div',{class:'card sky-focus-card', id:'skyFocusCard'});
+  sidebar.appendChild(focusCard);
+
+  const viewFull = el('button',{class:'view-full-chart', text:'View Full Chart'});
+  viewFull.onclick = ()=>{ const b = document.getElementById('navTop-chart'); if(b) b.click(); };
+  sidebar.appendChild(viewFull);
+
+  grid.appendChild(sidebar);
+
+  // ---------- sky panel ----------
+  const panel = el('div',{class:'sky-panel'});
+  const skySize = 720;
+  panel.innerHTML = buildSkySVG(N, window.STAR_DATA||[], window.CONSTELLATION_LINES||{features:[]}, window.ZODIAC_FIGURES||{}, skySize);
+  const infoBox = el('div',{class:'sky-info-box'});
+  infoBox.innerHTML = `<b>Your Sky</b>${dateStr}, ${timeStr}<br>${N.birth.place}`;
+  panel.appendChild(infoBox);
+  grid.appendChild(panel);
+
   wrap.appendChild(grid);
-
-  wrap.appendChild(divider());
-
-  const highlights = el('div',{class:'card'});
-  highlights.appendChild(el('div',{class:'card-title', text:'The Reading'}));
-  INTERP.overview.split('\n\n').forEach(para=>highlights.appendChild(readingP(para)));
-  wrap.appendChild(highlights);
-
   container.appendChild(wrap);
+
+  function renderFocusCard(type, name){
+    const p = N.points[name];
+    const text = INTERP.placements[name];
+    focusCard.innerHTML = '';
+    const heading = type==='angle' ? name : `${name} in ${p.sign}`;
+    focusCard.appendChild(el('div',{class:'card-title', text: heading}));
+    if(text){
+      focusCard.appendChild(readingP(text));
+    } else {
+      focusCard.appendChild(ledeP(`${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}.`));
+    }
+    [...pqv.children].forEach(b=>b.classList.toggle('active', b.dataset.name===name));
+  }
+
+  const skyCtl = wireSkyInteraction(panel, N, (type,name)=>renderFocusCard(type,name));
+  pqv.addEventListener('click', e=>{
+    const btn = e.target.closest('.pqv-btn');
+    if(!btn) return;
+    skyCtl.selectByName('planet', btn.dataset.name);
+  });
+
+  renderFocusCard('angle','Ascendant');
 }
 function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
 
@@ -1159,6 +1377,55 @@ function renderWheelPanel(container){
   });
   legend.appendChild(g);
   wrap.appendChild(legend);
+
+  // Moved here from the old single-panel Overview when Overview became the
+  // sky visualizer + slim sidebar: this is chart-level context, it belongs
+  // with the deep-reference instrument, not the daily-glance landing page.
+  const N = NATAL;
+  const grid = el('div',{class:'grid grid-2', style:'margin-top:14px;'});
+
+  const chartRuler = el('div',{class:'card'});
+  chartRuler.appendChild(el('div',{class:'card-title', text:'Chart Ruler & Sect'}));
+  chartRuler.appendChild(el('p',{class:'lede', style:'margin-bottom:6px', html:
+    `Ascendant in <b>${N.chart_ruler.asc_sign}</b>, ruled by <b>${N.chart_ruler.modern}</b>` +
+    (N.chart_ruler.modern!==N.chart_ruler.traditional ? ` (traditional: ${N.chart_ruler.traditional})` : '') + `.<br>` +
+    `Sect light: <b>${N.sect.light}</b>. The ${N.sect.is_day?'diurnal':'nocturnal'} sect governs which planets are dignified by triplicity.`
+  }));
+  grid.appendChild(chartRuler);
+
+  const balCard = el('div',{class:'card'});
+  balCard.appendChild(el('div',{class:'card-title', text:'Element & Modality Balance'}));
+  const elems = N.balance.elements, mods = N.balance.modalities;
+  const maxE = Math.max(...Object.values(elems)), maxM = Math.max(...Object.values(mods));
+  Object.keys(elems).forEach(k=>{
+    const r = el('div',{class:'bar-row'});
+    r.appendChild(el('div',{class:'label', text:k}));
+    const track = el('div',{class:'bar-track'});
+    track.appendChild(el('div',{class:'bar-fill', style:`width:${(elems[k]/maxE*100)}%`}));
+    r.appendChild(track);
+    r.appendChild(el('div',{class:'count', text:elems[k]}));
+    balCard.appendChild(r);
+  });
+  balCard.appendChild(el('div',{style:'height:8px'}));
+  Object.keys(mods).forEach(k=>{
+    const r = el('div',{class:'bar-row'});
+    r.appendChild(el('div',{class:'label', text:k}));
+    const track = el('div',{class:'bar-track'});
+    track.appendChild(el('div',{class:'bar-fill', style:`width:${(mods[k]/maxM*100)}%; background:var(--verdigris)`}));
+    r.appendChild(track);
+    r.appendChild(el('div',{class:'count', text:mods[k]}));
+    balCard.appendChild(r);
+  });
+  grid.appendChild(balCard);
+  wrap.appendChild(grid);
+
+  wrap.appendChild(divider());
+
+  const highlights = el('div',{class:'card'});
+  highlights.appendChild(el('div',{class:'card-title', text:'The Reading'}));
+  INTERP.overview.split('\n\n').forEach(para=>highlights.appendChild(readingP(para)));
+  wrap.appendChild(highlights);
+
   container.appendChild(wrap);
 }
 
@@ -1549,9 +1816,10 @@ function renderReportText(text){
 }
 
 // ---------- TABS / INIT ----------
-const TABS = [
-  ['overview','Overview', renderOverview],
-  ['horoscope','Horoscope', renderHoroscopePanel],
+// Two-level nav: three top items (Overview, Horoscope, Chart), Chart being a
+// parent with its own secondary row for the nine deep-reference pages. Those
+// nine pages are unchanged -- only where they live in the nav moved.
+const CHART_PAGES = [
   ['wheel','Wheel', renderWheelPanel],
   ['placements','Placements', renderPlacements],
   ['aspects','Aspects', renderAspectsPanel],
@@ -1562,28 +1830,74 @@ const TABS = [
   ['harmonics','Harmonics', renderHarmonics],
   ['progressions','Progressions', renderProgressions],
 ];
+const TOP_NAV = [
+  ['overview','Overview', renderOverview],
+  ['horoscope','Horoscope', renderHoroscopePanel],
+  ['chart','Chart', null],
+];
+const ALL_PAGES = [...TOP_NAV.filter(([id])=>id!=='chart'), ...CHART_PAGES];
 
 function initApp(){
   NATAL = window.NATAL_DATA;
   AD = new AstroData(window.NATAL_DATA, window.TRANSIT_DATA, window.PROGRESSIONS_DATA);
 
   const tabBar = $('#tabs');
+  const subNav = $('#chartSubnav');
   const panels = $('#panels');
-  TABS.forEach(([id,label,renderFn],i)=>{
-    const btn = el('button',{class:'tab'+(i===0?' active':''), text:label});
-    const panel = el('div',{class:'panel'+(i===0?' active':''), id:'panel-'+id});
-    btn.onclick = ()=>{
-      [...tabBar.children].forEach(x=>x.classList.remove('active'));
-      [...panels.children].forEach(x=>x.classList.remove('active'));
-      btn.classList.add('active');
-      panel.classList.add('active');
-      if(!rendered[id]){ renderFn(panel); rendered[id]=true; }
-    };
-    tabBar.appendChild(btn);
+
+  ALL_PAGES.forEach(([id,,renderFn])=>{
+    const panel = el('div',{class:'panel', id:'panel-'+id});
+    panel.renderFn = renderFn;
     panels.appendChild(panel);
   });
-  renderOverview($('#panel-overview'));
-  rendered['overview']=true;
+
+  let activeChartPage = CHART_PAGES[0][0];
+
+  function showPanel(id){
+    [...panels.children].forEach(p=>p.classList.remove('active'));
+    const panel = $('#panel-'+id);
+    panel.classList.add('active');
+    if(!rendered[id]){ panel.renderFn(panel); rendered[id]=true; }
+  }
+
+  function setTopActive(id){
+    [...tabBar.children].forEach(b=>b.classList.toggle('active', b.dataset.id===id));
+  }
+  function setSubActive(id){
+    [...subNav.children].forEach(b=>b.classList.toggle('active', b.dataset.id===id));
+  }
+
+  TOP_NAV.forEach(([id,label])=>{
+    const btn = el('button',{class:'tab', text:label, id:'navTop-'+id});
+    btn.dataset.id = id;
+    btn.onclick = ()=>{
+      if(id==='chart'){
+        setTopActive('chart');
+        subNav.style.display = '';
+        setSubActive(activeChartPage);
+        showPanel(activeChartPage);
+      } else {
+        setTopActive(id);
+        subNav.style.display = 'none';
+        showPanel(id);
+      }
+    };
+    tabBar.appendChild(btn);
+  });
+
+  CHART_PAGES.forEach(([id,label])=>{
+    const btn = el('button',{class:'tab', text:label});
+    btn.dataset.id = id;
+    btn.onclick = ()=>{
+      activeChartPage = id;
+      setSubActive(id);
+      showPanel(id);
+    };
+    subNav.appendChild(btn);
+  });
+
+  setTopActive('overview');
+  showPanel('overview');
 }
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
@@ -1600,10 +1914,13 @@ function initApp(){
   if(!session){ location.href = 'login.html'; return; }
 
   const { data: { user } } = await supabase.auth.getUser();
-  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }] = await Promise.all([
+  const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }, starsRes, constLinesRes, zodiacFiguresRes] = await Promise.all([
     supabase.from('charts').select('natal_json,prog_json').eq('user_id', user.id).maybeSingle(),
     supabase.from('sky_snapshots').select('transit_json').eq('id', 1).maybeSingle(),
     supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
+    fetch('stars.json').then(r=>r.json()),
+    fetch('constellation-lines.json').then(r=>r.json()),
+    fetch('zodiac-figures.json').then(r=>r.json()),
   ]);
 
   if(chartErr || !chart){ location.href = 'onboarding.html'; return; }
@@ -1616,6 +1933,9 @@ function initApp(){
   window.TRANSIT_DATA = sky.transit_json;
   window.PROGRESSIONS_DATA = chart.prog_json;
   window.USER_DISPLAY_NAME = (profile && profile.display_name) || (user.email ? user.email.split('@')[0] : 'Your Chart');
+  window.STAR_DATA = starsRes;
+  window.CONSTELLATION_LINES = constLinesRes;
+  window.ZODIAC_FIGURES = zodiacFiguresRes;
 
   loadingScreen.style.display = 'none';
   appEl.style.display = '';

@@ -113,13 +113,20 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
   .sky-sidebar{max-height:none; overflow-y:visible;}
 }
 @media (min-width:861px){
-  /* Match the sidebar's height to the sky panel's -- the panel is a square
-     SVG (height tracks its own rendered width), so it, not the sidebar, is
-     the real height source. min-height:0 stops the sidebar's own content
-     from inflating the grid row; the row then takes the panel's height and
-     the sidebar is stretched to exactly that, scrolling internally if its
-     content (a long focus-card reading, say) doesn't fit. */
-  .sky-sidebar{display:flex; flex-direction:column; min-height:0; overflow-y:auto; padding-right:6px;}
+  /* Capped to the sky panel's actual rendered height by JS (renderOverview's
+     syncSidebarHeight) -- the panel is a square SVG whose height depends only
+     on its own (viewport-driven) width, so it's the one stable source; CSS
+     grid's own auto-track sizing folded the sidebar's full content height
+     back in even with min-height:0 set on it, which fed back into the panel
+     and made the whole row resize on every selection. Direct children get
+     flex-shrink:0: without it, once max-height forces the column to be
+     shorter than its content, flex shrinks children (even below their own
+     text's height, since nothing here sets a min-height floor) instead of
+     leaving them at natural size for overflow-y to scroll -- the shrunk
+     focus card's text was spilling out past its own box and onto the button
+     below it. */
+  .sky-sidebar{display:flex; flex-direction:column; overflow-y:auto; padding-right:6px;}
+  .sky-sidebar > *{flex-shrink:0;}
 }
 .sky-sidebar .birth-block{margin-bottom:10px;}
 .sky-sidebar .birth-block .coords{font-family:var(--mono); font-size:11px; color:var(--paper-faint); margin-top:2px;}
@@ -127,9 +134,6 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .sky-sidebar .card-title{margin:0 0 8px; padding-bottom:6px;}
 .sky-sidebar .eyebrow{margin:0 0 6px;}
 .sky-sidebar .reading{font-size:13px; line-height:1.5; margin:0 0 9px;}
-@media (min-width:861px){
-  .sky-panel{display:flex; justify-content:center;}
-}
 .sky-panel{position:relative;}
 .sky-info-box{position:absolute; top:10px; right:10px; border:2px solid var(--ink-4); background:rgba(0,0,0,0.7); padding:9px 13px; font-family:var(--mono); font-size:11px; line-height:1.6; color:var(--paper-dim); max-width:220px;}
 .sky-info-box b{color:var(--paper); display:block; font-size:10px; letter-spacing:0.1em; text-transform:uppercase; margin-bottom:3px;}
@@ -892,7 +896,7 @@ function buildSkySVG(natal, stars, constLines, size){
   const lst = lstDegrees(natal.jd_ut, natal.birth.lon);
   const lat = natal.birth.lat;
   const svg = [];
-  svg.push(`<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:680px;height:auto;" id="skySvgRoot">`);
+  svg.push(`<svg viewBox="0 0 ${size} ${size}" xmlns="http://www.w3.org/2000/svg" style="display:block;width:100%;max-width:680px;height:auto;margin:0 auto;" id="skySvgRoot">`);
   svg.push(`<defs>
     <radialGradient id="skyBg" cx="50%" cy="50%" r="70%">
       <stop offset="0%" stop-color="#0a0a12"/><stop offset="75%" stop-color="#020204"/><stop offset="100%" stop-color="#000000"/>
@@ -1326,6 +1330,30 @@ function renderOverview(container){
   });
 
   renderFocusCard('angle','Ascendant');
+
+  // Lock the sidebar's cap to the sky panel's actual rendered height, measured
+  // directly rather than left to CSS grid auto-track sizing: the panel's
+  // height only ever depends on its own (viewport-driven) width, but grid's
+  // "auto" row-track sizing still folds in the sidebar's full natural content
+  // height even with min-height:0 set on it, so switching to a longer/shorter
+  // reading was inflating or shrinking the row -- and the panel along with it
+  // -- on every selection. Measuring imperatively breaks that feedback loop:
+  // the panel can no longer be pushed around by sidebar content, only by an
+  // actual viewport-width change.
+  function syncSidebarHeight(){
+    if(window.innerWidth > 860){
+      // Measure the SVG itself, not the .sky-panel div -- the div is a grid
+      // item that can be stretched by the row's track size, but the SVG's
+      // own block-level intrinsic sizing (width-driven, aspect-locked) is
+      // immune to that, so it's the one true, content-independent source.
+      const svgEl = panel.querySelector('#skySvgRoot');
+      if(svgEl) sidebar.style.maxHeight = svgEl.getBoundingClientRect().height + 'px';
+    } else {
+      sidebar.style.maxHeight = '';
+    }
+  }
+  requestAnimationFrame(syncSidebarHeight);
+  window.addEventListener('resize', syncSidebarHeight);
 }
 function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
 

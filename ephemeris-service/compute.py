@@ -20,7 +20,14 @@ TRANSIT_BODIES = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"
 PROG_BODIES = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn",
                 "Uranus", "Neptune", "Pluto"]
 TRAD7 = ["Sun", "Moon", "Mercury", "Venus", "Mars", "Jupiter", "Saturn"]
-DEFAULT_WINDOW_START = datetime.date(2024, 1, 1)
+# 1950, not 2024: the frontend's "echoes" feature (Horoscope tab) looks back
+# through this same shared window for a person's own prior exact hit of an
+# upcoming transit -- Saturn/Uranus/Neptune/Pluto cycles run 7-42+ years, so
+# a window that only starts at "now" can never surface those, only retrograde
+# repeats within a year or two. 1950 covers essentially any living user's
+# whole life. Computing the wider window is cheap (~2s, ~6MB of JSON) --
+# verified locally before choosing this date, not a guess.
+DEFAULT_WINDOW_START = datetime.date(1950, 1, 1)
 DEFAULT_WINDOW_END = datetime.date(2034, 12, 31)
 MAX_PROGRESSION_AGE = 105
 

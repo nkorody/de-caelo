@@ -359,6 +359,12 @@ class AstroData {
     for(const k in natal.points) this.natalLons[k] = natal.points[k].lon;
   }
   dateRange(){ return {start:this.transits.start, end:this.transits.end}; }
+  // Lower bound for echo-finding: don't surface a "resonance" from before the
+  // person was born, even if the shared window's own data goes back further.
+  birthIndex(){
+    const b = this.natal.birth;
+    return this.indexFor(`${b.year}-${String(b.month).padStart(2,'0')}-${String(b.day).padStart(2,'0')}`);
+  }
   clampDate(dateStr){
     if(dateStr < this.transits.start) return this.transits.start;
     if(dateStr > this.transits.end) return this.transits.end;
@@ -577,6 +583,49 @@ function describeAspect(ad, a){
   return `Transiting ${a.transiting} ${mode} your natal ${natalPointLabel(a.natal, natal)}, orb ${a.orb.toFixed(2)}\u00b0.${exact} It brings ${theme} to bear on ${domain}.`;
 }
 
+// "Echoes": the same transiting-planet-to-natal-point aspect, exact at some
+// earlier point in this person's own life. Saturn/Uranus/Neptune/Pluto cycles
+// (7-42+ years) are the ones this actually matters for -- a window that only
+// starts at "now" could never surface those, which is why the shared transit
+// window itself starts in 1950 (see compute.py), not just at launch.
+//
+// Finds every past exact crossing (the same signed-orb zero-crossing
+// aspectWhen()/findExactCrossing() use for "exact today") from birth up to
+// beforeIdx, and returns the most recent one -- skipping the last ~200 days
+// before beforeIdx so a body mid-approach to *this* exact hit doesn't get
+// reported as an "echo" of itself.
+function findEchoCrossing(ad, transiting, natal, aspectAngle, beforeIdx, lo){
+  const MIN_GAP_DAYS = 200;
+  const natalLon = ad.natalLons[natal];
+  const lonArr = ad.transits.lon[transiting];
+  const signedOrb = i => angularSep(lonArr[i], natalLon) - aspectAngle;
+  const from = Math.max(0, lo);
+  const cutoff = beforeIdx - MIN_GAP_DAYS;
+  if(cutoff <= from+1) return null;
+  let last = null;
+  let prev = signedOrb(from);
+  for(let i=from+1; i<=cutoff; i++){
+    const cur = signedOrb(i);
+    if((prev<0)!==(cur<0)){
+      last = {idx:i-1, frac: prev/(prev-cur)};
+    }
+    prev = cur;
+  }
+  return last ? crossingToLocal(ad, last) : null;
+}
+function describeEcho(ad, a){
+  // The Moon repeats this same contact roughly monthly -- never a meaningful
+  // "years ago" echo, just noise.
+  if(a.transiting==='Moon' || a.idx===undefined) return '';
+  const crossing = findEchoCrossing(ad, a.transiting, a.natal, ASPECT_ANGLE[a.aspect], a.idx, ad.birthIndex());
+  if(!crossing) return '';
+  const days = (new Date(ad.transits.dates[a.idx]+'T00:00:00Z') - new Date(crossing.date+'T00:00:00Z')) / 86400000;
+  const years = days/365.2425;
+  const monthsRounded = Math.max(1, Math.round(days/30.44));
+  const ago = years < 1.5 ? `${monthsRounded} month${monthsRounded===1?'':'s'} ago` : `${years.toFixed(1)} years ago`;
+  return ` This mirrors ${weekdayShort(crossing.date)}, ${niceDate(crossing.date)} ${crossing.date.slice(0,4)}, about ${ago} \u2014 the same contact, exact then too.`;
+}
+
 function dailyReport(ad, dateStr){
   dateStr = ad.clampDate(dateStr);
   const idx = ad.indexFor(dateStr);
@@ -605,7 +654,7 @@ function dailyReport(ad, dateStr){
     const tenor = reportTenor(top);
     if(tenor) lines.push(tenor);
     lines.push("Today's contacts, closest first:");
-    top.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+    top.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)+describeEcho(ad, a)));
   }
   return {date:dateStr, moon, moonSign, moonHouse, aspects: top, stations, ingresses, text: lines.join('\n')};
 }
@@ -649,7 +698,7 @@ function weeklyReport(ad, startDateStr){
   if(tenor) lines.push(tenor);
   lines.push("This week's standing contacts, closest first:");
   if(weekAspects.length===0) lines.push('Nothing exact from the slower planets this week. The Moon carries the week on its own.');
-  weekAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+  weekAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)+describeEcho(ad, a)));
 
   return {start:startDateStr, end:endDate, moonPath, aspects: weekAspects, ingresses, stations, text: lines.join('\n')};
 }
@@ -705,7 +754,7 @@ function monthlyReport(ad, monthStr){ // 'YYYY-MM'
   const tenor = reportTenor(monthAspects);
   if(tenor) lines.push(tenor);
   lines.push("This month's standing transits, closest first:");
-  monthAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)));
+  monthAspects.forEach(a=>lines.push('\u2022 '+describeAspect(ad, a)+describeEcho(ad, a)));
   if(progAspects.length){
     lines.push('');
     lines.push('Progressions in effect this year:');

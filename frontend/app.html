@@ -116,10 +116,12 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .sky-focus-card{min-height:96px;}
 .view-full-chart{display:block; text-align:center; margin-top:18px; font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; padding:12px; border:2px solid var(--paper); color:var(--paper); background:transparent; cursor:pointer; font-weight:700; text-decoration:none;}
 .view-full-chart:hover{background:var(--paper); color:var(--ink);}
-.sky-obj{cursor:pointer;}
+.sky-obj{cursor:pointer; outline:none;}
+.sky-obj:focus{outline:none;}
 .wheel-wrap{display:flex; justify-content:center; padding:10px 0 14px; position:relative;}
 .wheel-wrap svg{max-width:100%; height:auto;}
-.wheel-planet{cursor:help;}
+.wheel-planet{cursor:help; outline:none;}
+.wheel-planet:focus{outline:none;}
 .wheel-planet .wp-halo{transition:stroke-width .15s ease, opacity .15s ease; opacity:0;}
 .wheel-planet .wp-body{transition:filter .15s ease;}
 .wheel-planet:hover .wp-halo, .wheel-planet:focus .wp-halo{stroke-width:2; opacity:0.85;}
@@ -950,7 +952,7 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
     svg.push(`<g class="sky-obj" data-type="planet" data-name="${name}" tabindex="0">`);
     svg.push(`<circle class="so-halo" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="16" fill="none" stroke="${WC.paper}" stroke-width="0"/>`);
     svg.push(`<circle class="so-body" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4" fill="${WC.paper}" filter="url(#bodyGlow)"/>`);
-    svg.push(`<text class="so-label" x="${x.toFixed(1)}" y="${(y-10).toFixed(1)}" text-anchor="middle" font-size="10.5" font-family="monospace" letter-spacing="1" fill="${WC.paper}" opacity="0">${name.toUpperCase()}</text>`);
+    svg.push(`<text class="so-label" x="${x.toFixed(1)}" y="${(y-10).toFixed(1)}" text-anchor="middle" font-size="10.5" font-family="monospace" letter-spacing="1" fill="${WC.paper}" opacity="0">${name.toUpperCase()} · ${p.sign.toUpperCase()}</text>`);
     svg.push(`</g>`);
   });
 

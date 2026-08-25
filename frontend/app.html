@@ -868,7 +868,7 @@ const SIGN_TO_ABBR = {Aries:'Ari',Taurus:'Tau',Gemini:'Gem',Cancer:'Cnc',Leo:'Le
 // true projection -- deliberately, since this shape gets stamped at a
 // planet's screen position afterward, not projected from a real sky
 // position; see the note at zodiacGhostLayer in buildSkySVG for why).
-function zodiacGhostPaths(signName, pxPerDeg){
+function zodiacGhostPaths(signName, targetRadius){
   const abbr = SIGN_TO_ABBR[signName];
   const strokes = (window.ZODIAC_FIGURES||{})[abbr];
   if(!strokes) return '';
@@ -877,16 +877,29 @@ function zodiacGhostPaths(signName, pxPerDeg){
   allPts.forEach(([raDeg,dec])=>{ sinSum+=Math.sin(raDeg*D2R); cosSum+=Math.cos(raDeg*D2R); decSum+=dec; });
   const centroidRa = Math.atan2(sinSum,cosSum)*R2D;
   const centroidDec = decSum/allPts.length;
+  // Normalize to a consistent on-screen size regardless of the sign's actual
+  // angular extent (Cancer's few, spread-out stars vs. Taurus's tight
+  // cluster would otherwise render at wildly different sizes at a fixed
+  // px-per-degree). Find the farthest point from centroid, scale so that
+  // reaches targetRadius.
+  let maxR = 0.001;
+  allPts.forEach(([raDeg,dec])=>{
+    let dRa = raDeg - centroidRa;
+    if(dRa > 180) dRa -= 360; if(dRa < -180) dRa += 360;
+    const dDec = dec - centroidDec;
+    maxR = Math.max(maxR, Math.hypot(dRa, dDec));
+  });
+  const scale = targetRadius / maxR;
   let paths = '';
   strokes.forEach(stroke=>{
     let d = '';
     stroke.forEach(([raDeg,dec],i)=>{
       let dRa = raDeg - centroidRa;
       if(dRa > 180) dRa -= 360; if(dRa < -180) dRa += 360;
-      const x = -dRa*pxPerDeg, y = -(dec-centroidDec)*pxPerDeg; // RA increases eastward (leftward in this mirrored view); Dec increases "up"
+      const x = -dRa*scale, y = -(dec-centroidDec)*scale; // RA increases eastward (leftward in this mirrored view); Dec increases "up"
       d += (i===0) ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
     });
-    paths += `<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+    paths += `<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>`;
   });
   return paths;
 }
@@ -914,6 +927,11 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
       <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="core"/>
       <feMerge><feMergeNode in="wide"/><feMergeNode in="wide"/><feMergeNode in="core"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
+    <radialGradient id="ghostHaze" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.5"/>
+      <stop offset="45%" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
   </defs>`);
   svg.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#skyBg)" stroke="${WC.brassDim}" stroke-width="1"/>`);
 
@@ -1342,19 +1360,23 @@ function renderOverview(container){
   container.appendChild(wrap);
 
   const ghostLayer = panel.querySelector('#zodiacGhostLayer');
-  function showZodiacGhost(sign, anchorName){
-    const marker = panel.querySelector(`.sky-obj[data-name="${anchorName}"] .so-halo`);
-    if(!marker){ ghostLayer.innerHTML = ''; return; } // below the horizon: nothing sensible to anchor to
-    const ax = marker.getAttribute('cx'), ay = marker.getAttribute('cy');
-    const paths = zodiacGhostPaths(sign, 15);
+  function showZodiacGhost(sign){
+    // Not tied to any real position (a planet's tropical sign and the real
+    // sky position of the same-named constellation are different things --
+    // see the note at zodiacGhostLayer in buildSkySVG). Centered instead:
+    // a large, atmospheric presence behind the actual star data, not a
+    // small badge pinned to the planet's own marker.
+    const paths = zodiacGhostPaths(sign, 175);
     if(!paths) return;
+    const mid = skySize/2;
+    const haze = `<circle cx="0" cy="0" r="190" fill="url(#ghostHaze)"/>`;
     // Set via innerHTML, not createElement/appendChild: SVG elements need the
     // SVG namespace, which plain document.createElement doesn't give them --
     // assigning markup to an SVG-namespaced parent's innerHTML parses it
     // correctly, same trick already used for the rest of the sky SVG.
-    ghostLayer.innerHTML = `<g transform="translate(${ax},${ay})" opacity="0" filter="url(#ghostGlow)">${paths}</g>`;
+    ghostLayer.innerHTML = `<g transform="translate(${mid},${mid})" opacity="0" filter="url(#ghostGlow)">${haze}${paths}</g>`;
     const g = ghostLayer.firstElementChild;
-    requestAnimationFrame(()=>{ g.style.transition = 'opacity .6s ease'; g.style.opacity = '0.7'; });
+    requestAnimationFrame(()=>{ g.style.transition = 'opacity .8s ease'; g.style.opacity = '0.6'; });
   }
 
   function renderFocusCard(type, name){
@@ -1369,7 +1391,7 @@ function renderOverview(container){
       focusCard.appendChild(ledeP(`${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}.`));
     }
     [...pqv.children].forEach(b=>b.classList.toggle('active', b.dataset.name===name));
-    if(p.sign) showZodiacGhost(p.sign, name);
+    if(p.sign) showZodiacGhost(p.sign);
   }
 
   const skyCtl = wireSkyInteraction(panel, N, (type,name)=>renderFocusCard(type,name));

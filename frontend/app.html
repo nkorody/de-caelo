@@ -211,16 +211,20 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 .harm-btn{font-family:var(--mono); font-size:13px; padding:6px 14px; background:var(--ink); border:1px solid var(--ink-4); color:var(--paper-faint); cursor:pointer;}
 .harm-btn.active{color:var(--ink); background:var(--paper); border-color:var(--paper); font-weight:700;}
 
-/* glossary tooltips */
-.term{border-bottom:1px dotted var(--paper-faint); cursor:help; position:relative;}
-.term .term-tip{
-  visibility:hidden; opacity:0; position:absolute; left:50%; bottom:calc(100% + 9px); transform:translateX(-50%);
+/* glossary tooltips -- a single shared, viewport-fixed element (#termTip,
+   wired up in wireTermTooltips()) rather than one absolute-positioned child
+   per term. Terms show up inside narrow, vertically-scrolling containers
+   (the Overview sidebar in particular), and an absolutely-positioned child
+   there gets clipped by the ancestor's own overflow -- fixed positioning
+   escapes that entirely and paints above everything, same as .wheel-tip. */
+.term{border-bottom:1px dotted var(--paper-faint); cursor:help;}
+.term-tip{
+  visibility:hidden; opacity:0; position:fixed;
   background:#000000; border:2px solid var(--paper); color:#ffffff; font-size:13px; line-height:1.5;
-  padding:9px 11px; width:240px; max-width:62vw; z-index:80; transition:opacity .12s ease; pointer-events:none;
+  padding:9px 11px; width:240px; max-width:calc(100vw - 24px); z-index:120; transition:opacity .12s ease; pointer-events:none;
   font-family:var(--serif); text-transform:none; letter-spacing:normal; font-variant:normal; text-align:left;
 }
-.term .term-tip::after{content:''; position:absolute; top:100%; left:50%; transform:translateX(-50%); border:5px solid transparent; border-top-color:var(--paper);}
-.term:hover .term-tip, .term:focus .term-tip{visibility:visible; opacity:1;}
+.term-tip.show{visibility:visible; opacity:1;}
 
 ::-webkit-scrollbar{width:8px; height:8px;}
 ::-webkit-scrollbar-thumb{background:var(--paper-faint);}
@@ -1253,7 +1257,8 @@ function annotateTerms(text){
   return escaped.replace(GLOSSARY_REGEX, (m)=>{
     const def = GLOSSARY_LOWER[m.toLowerCase()];
     if(!def) return m;
-    return `<span class="term">${m}<span class="term-tip">${escapeHtml(def)}</span></span>`;
+    const attrDef = escapeHtml(def).replace(/"/g,'&quot;');
+    return `<span class="term" tabindex="0" data-def="${attrDef}">${m}</span>`;
   });
 }
 
@@ -1444,6 +1449,46 @@ function wireWheelTooltip(ww){
     if(g) show(g, {clientX: g.getBoundingClientRect().left, clientY: g.getBoundingClientRect().top});
   });
   ww.addEventListener('focusout', hide);
+}
+// Delegated at document level (not wired per-panel like wireWheelTooltip):
+// .term spans get rebuilt fresh every time a panel re-renders, scattered
+// across every tab, so one listener that checks e.target.closest('.term')
+// covers all of them without needing to re-wire on every render.
+function wireTermTooltips(){
+  let tip = document.getElementById('termTip');
+  if(!tip){
+    tip = el('div',{class:'term-tip', id:'termTip'});
+    document.body.appendChild(tip);
+  }
+  function show(target){
+    const def = target.dataset.def;
+    if(!def) return;
+    tip.textContent = def;
+    tip.classList.add('show');
+    const r = target.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight, pad = 8;
+    let left = r.left + r.width/2 - tw/2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - tw - pad));
+    let top = r.top - th - 9;
+    if(top < pad) top = r.bottom + 9;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
+  }
+  function hide(){ tip.classList.remove('show'); }
+  document.addEventListener('mouseover', e=>{
+    const t = e.target.closest('.term');
+    if(t) show(t);
+  });
+  document.addEventListener('mouseout', e=>{
+    if(e.target.closest('.term') && !e.relatedTarget?.closest?.('.term')) hide();
+  });
+  document.addEventListener('focusin', e=>{
+    const t = e.target.closest('.term');
+    if(t) show(t);
+  });
+  document.addEventListener('focusout', e=>{
+    if(e.target.closest('.term')) hide();
+  });
 }
 function renderWheelPanel(container){
   const wrap = el('div');
@@ -1923,6 +1968,7 @@ const ALL_PAGES = [...TOP_NAV.filter(([id])=>id!=='chart'), ...CHART_PAGES];
 function initApp(){
   NATAL = window.NATAL_DATA;
   AD = new AstroData(window.NATAL_DATA, window.TRANSIT_DATA, window.PROGRESSIONS_DATA);
+  wireTermTooltips();
 
   const tabBar = $('#tabs');
   const subNav = $('#chartSubnav');

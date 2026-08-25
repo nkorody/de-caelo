@@ -107,10 +107,11 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .bar-fill{height:100%; background:var(--paper);}
 .bar-row .count{width:20px; text-align:right; color:var(--paper-dim);}
 
-.sky-grid{display:grid; grid-template-columns:300px 1fr; gap:28px; align-items:stretch;}
+.sky-grid{display:grid; grid-template-columns:300px 1fr; gap:28px; align-items:stretch; margin-top:22px;}
 @media (max-width:860px){
   .sky-grid{grid-template-columns:1fr;}
-  .sky-sidebar{max-height:none; overflow-y:visible;}
+  .sky-sidebar{max-height:none;}
+  .sky-sidebar-scroll{overflow-y:visible;}
 }
 @media (min-width:861px){
   /* Capped to the sky panel's actual rendered height by JS (renderOverview's
@@ -118,15 +119,20 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
      on its own (viewport-driven) width, so it's the one stable source; CSS
      grid's own auto-track sizing folded the sidebar's full content height
      back in even with min-height:0 set on it, which fed back into the panel
-     and made the whole row resize on every selection. Direct children get
-     flex-shrink:0: without it, once max-height forces the column to be
-     shorter than its content, flex shrinks children (even below their own
-     text's height, since nothing here sets a min-height floor) instead of
-     leaving them at natural size for overflow-y to scroll -- the shrunk
-     focus card's text was spilling out past its own box and onto the button
-     below it. */
-  .sky-sidebar{display:flex; flex-direction:column; overflow-y:auto; padding-right:6px;}
+     and made the whole row resize on every selection. */
+  .sky-sidebar{display:flex; flex-direction:column;}
+  /* The View Full Chart button lives outside .sky-sidebar-scroll as a plain
+     flex sibling (flex-shrink:0, its natural size) so it's never part of the
+     scrolling region -- always visible, never scrolled past. The scroll
+     region takes whatever's left via flex:1 and scrolls internally. Its own
+     children get flex-shrink:0: without it, once the sidebar is shorter than
+     its content, flex shrinks children (even below their own text's height,
+     since nothing here sets a min-height floor) instead of leaving them at
+     natural size for overflow-y to scroll -- the shrunk focus card's text
+     was spilling out past its own box and onto the button below it. */
   .sky-sidebar > *{flex-shrink:0;}
+  .sky-sidebar-scroll{flex:1 1 auto; min-height:0; overflow-y:auto; padding-right:6px;}
+  .sky-sidebar-scroll > *{flex-shrink:0;}
 }
 .sky-sidebar .birth-block{margin-bottom:10px;}
 .sky-sidebar .birth-block .coords{font-family:var(--mono); font-size:11px; color:var(--paper-faint); margin-top:2px;}
@@ -146,7 +152,7 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .pqv-btn.active{border-color:var(--paper); background:var(--paper); color:var(--ink);}
 .sky-focus-card{min-height:0;}
 .view-full-chart{display:block; text-align:center; margin-top:18px; font-family:var(--mono); font-size:12px; letter-spacing:0.1em; text-transform:uppercase; padding:12px; border:2px solid var(--paper); color:var(--paper); background:transparent; cursor:pointer; font-weight:700; text-decoration:none;}
-.sky-sidebar .view-full-chart{margin-top:10px; padding:9px;}
+.sky-sidebar .view-full-chart{margin-top:20px; padding:9px;}
 .view-full-chart:hover{background:var(--paper); color:var(--ink);}
 .sky-obj{cursor:pointer; outline:none;}
 .sky-obj:focus{outline:none;}
@@ -199,7 +205,7 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 .divider{display:flex; align-items:center; gap:12px; margin:28px 0 20px; opacity:0.9;}
 .divider .line{flex:1; height:1px; background:var(--brass-dim);}
 
-.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:28px; line-height:1.7; border-top:3px solid var(--ink-4); padding-top:14px;}
+.footnote{font-family:var(--mono); font-size:11.5px; color:var(--paper-faint); margin-top:52px; line-height:1.7; border-top:3px solid var(--ink-4); padding-top:14px;}
 
 .harm-select{display:flex; gap:8px; margin-bottom:16px;}
 .harm-btn{font-family:var(--mono); font-size:13px; padding:6px 14px; background:var(--ink); border:1px solid var(--ink-4); color:var(--paper-faint); cursor:pointer;}
@@ -1254,14 +1260,20 @@ function renderOverview(container){
   const grid = el('div',{class:'sky-grid'});
 
   // ---------- sidebar ----------
+  // Split in two: sidebarScroll holds everything that can grow with the data
+  // (birth info, Big Three, Planet Quick View, the focus-card reading) and
+  // scrolls on its own when it doesn't fit; the View Full Chart button lives
+  // outside that scrolling area, as its own fixed sibling, so it never
+  // scrolls out of view with it.
   const sidebar = el('div',{class:'sky-sidebar'});
+  const sidebarScroll = el('div',{class:'sky-sidebar-scroll'});
 
   const birthBlock = el('div',{class:'birth-block'});
   birthBlock.appendChild(el('h2',{class:'section-title', style:'font-size:19px;', text: window.USER_DISPLAY_NAME}));
   birthBlock.appendChild(el('div',{class:'lede', style:'margin:2px 0 0; font-size:13px;', text: N.birth.place}));
   birthBlock.appendChild(el('div',{class:'coords', text: `${dateStr}, ${timeStr}`}));
   birthBlock.appendChild(el('div',{class:'coords', text: coordStr}));
-  sidebar.appendChild(birthBlock);
+  sidebarScroll.appendChild(birthBlock);
 
   const bt = el('div',{class:'card'});
   bt.appendChild(el('div',{class:'card-title', text:'The Big Three'}));
@@ -1274,9 +1286,9 @@ function renderOverview(container){
     row.appendChild(item);
   });
   bt.appendChild(row);
-  sidebar.appendChild(bt);
+  sidebarScroll.appendChild(bt);
 
-  sidebar.appendChild(el('div',{class:'eyebrow', style:'margin-top:0;', text:'Planet Quick View'}));
+  sidebarScroll.appendChild(el('div',{class:'eyebrow', style:'margin-top:0;', text:'Planet Quick View'}));
   const pqv = el('div',{class:'planet-quickview', id:'planetQuickView'});
   SKY_BODIES.forEach(name=>{
     const glyph = BODY_GLYPH[name];
@@ -1285,10 +1297,11 @@ function renderOverview(container){
     btn.title = name;
     pqv.appendChild(btn);
   });
-  sidebar.appendChild(pqv);
+  sidebarScroll.appendChild(pqv);
 
   const focusCard = el('div',{class:'card sky-focus-card', id:'skyFocusCard'});
-  sidebar.appendChild(focusCard);
+  sidebarScroll.appendChild(focusCard);
+  sidebar.appendChild(sidebarScroll);
 
   const viewFull = el('button',{class:'view-full-chart', text:'View Full Chart'});
   viewFull.onclick = ()=>{ const b = document.getElementById('navTop-chart'); if(b) b.click(); };
@@ -1354,6 +1367,23 @@ function renderOverview(container){
   }
   requestAnimationFrame(syncSidebarHeight);
   window.addEventListener('resize', syncSidebarHeight);
+
+  // Your Sky sits inside the panel wherever CSS says (top:10px); Big Three
+  // sits below the birth block, whose height isn't a fixed number (a longer
+  // display name or place can wrap to another line). Rather than guess that
+  // height, measure the real gap above Big Three and give Your Sky the same
+  // one, so both boxes start the same distance below the tab bar regardless
+  // of how tall the birth block actually renders.
+  function syncInfoBoxOffset(){
+    if(window.innerWidth > 860){
+      const gap = bt.getBoundingClientRect().top - sidebar.getBoundingClientRect().top;
+      infoBox.style.top = gap + 'px';
+    } else {
+      infoBox.style.top = '';
+    }
+  }
+  requestAnimationFrame(syncInfoBoxOffset);
+  window.addEventListener('resize', syncInfoBoxOffset);
 }
 function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]||s[v]||s[0]; }
 

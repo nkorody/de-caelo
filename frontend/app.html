@@ -859,6 +859,37 @@ function skyProject(az, alt, R, cx, cy){
 }
 const SKY_BODIES = ['Sun','Moon','Mercury','Venus','Mars','Jupiter','Saturn','Uranus','Neptune','Pluto'];
 const ZODIAC_ABBR = {Ari:'Aries',Tau:'Taurus',Gem:'Gemini',Cnc:'Cancer',Leo:'Leo',Vir:'Virgo',Lib:'Libra',Sco:'Scorpius',Sgr:'Sagittarius',Cap:'Capricornus',Aqr:'Aquarius',Psc:'Pisces'};
+// astrological sign name (as it appears on natal.points[*].sign) -> zodiac-figures.json key.
+// Differs from ZODIAC_ABBR's constellation names for Scorpio/Capricorn specifically.
+const SIGN_TO_ABBR = {Aries:'Ari',Taurus:'Tau',Gemini:'Gem',Cancer:'Cnc',Leo:'Leo',Virgo:'Vir',Libra:'Lib',Scorpio:'Sco',Sagittarius:'Sgr',Capricorn:'Cap',Aquarius:'Aqr',Pisces:'Psc'};
+
+// Flat local-tangent-plane template for a sign's creature: delta-RA/delta-Dec
+// from its own centroid, in raw degrees (a small-angle approximation, not a
+// true projection -- deliberately, since this shape gets stamped at a
+// planet's screen position afterward, not projected from a real sky
+// position; see the note at zodiacGhostLayer in buildSkySVG for why).
+function zodiacGhostPaths(signName, pxPerDeg){
+  const abbr = SIGN_TO_ABBR[signName];
+  const strokes = (window.ZODIAC_FIGURES||{})[abbr];
+  if(!strokes) return '';
+  const allPts = strokes.flat();
+  let sinSum=0, cosSum=0, decSum=0;
+  allPts.forEach(([raDeg,dec])=>{ sinSum+=Math.sin(raDeg*D2R); cosSum+=Math.cos(raDeg*D2R); decSum+=dec; });
+  const centroidRa = Math.atan2(sinSum,cosSum)*R2D;
+  const centroidDec = decSum/allPts.length;
+  let paths = '';
+  strokes.forEach(stroke=>{
+    let d = '';
+    stroke.forEach(([raDeg,dec],i)=>{
+      let dRa = raDeg - centroidRa;
+      if(dRa > 180) dRa -= 360; if(dRa < -180) dRa += 360;
+      const x = -dRa*pxPerDeg, y = -(dec-centroidDec)*pxPerDeg; // RA increases eastward (leftward in this mirrored view); Dec increases "up"
+      d += (i===0) ? `M${x.toFixed(1)},${y.toFixed(1)}` : `L${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+    paths += `<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>`;
+  });
+  return paths;
+}
 
 function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
   const R = size/2 - 6, cx = size/2, cy = size/2;
@@ -877,6 +908,11 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
     <filter id="bodyGlow" x="-300%" y="-300%" width="700%" height="700%">
       <feGaussianBlur stdDeviation="4.5" result="blur"/>
       <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="ghostGlow" x="-80%" y="-80%" width="260%" height="260%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="wide"/>
+      <feGaussianBlur in="SourceGraphic" stdDeviation="2.2" result="core"/>
+      <feMerge><feMergeNode in="wide"/><feMergeNode in="wide"/><feMergeNode in="core"/><feMergeNode in="SourceGraphic"/></feMerge>
     </filter>
   </defs>`);
   svg.push(`<circle cx="${cx}" cy="${cy}" r="${R}" fill="url(#skyBg)" stroke="${WC.brassDim}" stroke-width="1"/>`);
@@ -916,6 +952,19 @@ function buildSkySVG(natal, stars, constLines, zodiacFigures, size){
       if(d) svg.push(`<path d="${d}" fill="none" stroke="${WC.paper}" stroke-width="0.6" opacity="0.12"/>`);
     });
   });
+
+  // "Ghost" figure group: populated dynamically at selection time (see
+  // zodiacGhostPaths()/showZodiacGhost() below), anchored at the *selected
+  // planet's* own screen position rather than the real sky position of the
+  // same-named constellation. Those are genuinely different things -- a
+  // planet's tropical sign and the physical constellation with the same
+  // name can be nowhere near each other at a given moment (here, Cancer
+  // the constellation sits well below the horizon at this exact birth
+  // moment even though the Ascendant is astrologically in Cancer), so
+  // anchoring to the constellation's real position is both geometrically
+  // degenerate near/below the horizon and conceptually the wrong claim
+  // for what this is annotating.
+  svg.push(`<g id="zodiacGhostLayer"></g>`);
 
   // stars, brightest last so they layer on top
   const projectedStars = stars.map(([raDeg,dec,mag,name,con])=>{
@@ -1292,6 +1341,22 @@ function renderOverview(container){
   wrap.appendChild(grid);
   container.appendChild(wrap);
 
+  const ghostLayer = panel.querySelector('#zodiacGhostLayer');
+  function showZodiacGhost(sign, anchorName){
+    const marker = panel.querySelector(`.sky-obj[data-name="${anchorName}"] .so-halo`);
+    if(!marker){ ghostLayer.innerHTML = ''; return; } // below the horizon: nothing sensible to anchor to
+    const ax = marker.getAttribute('cx'), ay = marker.getAttribute('cy');
+    const paths = zodiacGhostPaths(sign, 15);
+    if(!paths) return;
+    // Set via innerHTML, not createElement/appendChild: SVG elements need the
+    // SVG namespace, which plain document.createElement doesn't give them --
+    // assigning markup to an SVG-namespaced parent's innerHTML parses it
+    // correctly, same trick already used for the rest of the sky SVG.
+    ghostLayer.innerHTML = `<g transform="translate(${ax},${ay})" opacity="0" filter="url(#ghostGlow)">${paths}</g>`;
+    const g = ghostLayer.firstElementChild;
+    requestAnimationFrame(()=>{ g.style.transition = 'opacity .6s ease'; g.style.opacity = '0.7'; });
+  }
+
   function renderFocusCard(type, name){
     const p = N.points[name];
     const text = INTERP.placements[name];
@@ -1304,6 +1369,7 @@ function renderOverview(container){
       focusCard.appendChild(ledeP(`${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}.`));
     }
     [...pqv.children].forEach(b=>b.classList.toggle('active', b.dataset.name===name));
+    if(p.sign) showZodiacGhost(p.sign, name);
   }
 
   const skyCtl = wireSkyInteraction(panel, N, (type,name)=>renderFocusCard(type,name));

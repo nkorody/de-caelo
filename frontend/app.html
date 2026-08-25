@@ -107,8 +107,20 @@ td.num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
 .bar-fill{height:100%; background:var(--paper);}
 .bar-row .count{width:20px; text-align:right; color:var(--paper-dim);}
 
-.sky-grid{display:grid; grid-template-columns:300px 1fr; gap:28px; align-items:start;}
-@media (max-width:860px){ .sky-grid{grid-template-columns:1fr;} }
+.sky-grid{display:grid; grid-template-columns:300px 1fr; gap:28px; align-items:stretch;}
+@media (max-width:860px){
+  .sky-grid{grid-template-columns:1fr;}
+  .sky-sidebar{max-height:none; overflow-y:visible;}
+}
+@media (min-width:861px){
+  /* Match the sidebar's height to the sky panel's -- the panel is a square
+     SVG (height tracks its own rendered width), so it, not the sidebar, is
+     the real height source. min-height:0 stops the sidebar's own content
+     from inflating the grid row; the row then takes the panel's height and
+     the sidebar is stretched to exactly that, scrolling internally if its
+     content (a long focus-card reading, say) doesn't fit. */
+  .sky-sidebar{display:flex; flex-direction:column; min-height:0; overflow-y:auto; padding-right:6px;}
+}
 .sky-sidebar .birth-block{margin-bottom:18px;}
 .sky-sidebar .birth-block .coords{font-family:var(--mono); font-size:12px; color:var(--paper-faint); margin-top:2px;}
 .sky-panel{position:relative;}

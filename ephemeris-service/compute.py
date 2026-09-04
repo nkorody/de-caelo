@@ -144,6 +144,7 @@ def compute_natal(birth: dict, utc_offset: float) -> tuple[dict, float]:
                           lons["Mars"], lons["Jupiter"], lons["Saturn"], is_day)
     parts_placements = {k: deg_to_sign(v) for k, v in parts.items()}
     parts_houses = {k: house_of(v, cusps_p) for k, v in parts.items()}
+    parts_houses_whole = {k: house_of(v, cusps_w) for k, v in parts.items()}
 
     harmonic_lons_base = {k: v for k, v in lons.items() if k in list(BODIES.keys()) + ["South Node", "Ascendant", "Midheaven"]}
     harmonics = {}
@@ -197,7 +198,12 @@ def compute_natal(birth: dict, utc_offset: float) -> tuple[dict, float]:
         "dispositors": {"modern": {"map": disp_modern, "chains": chains_modern},
                           "traditional": {"map": disp_trad, "chains": chains_trad}},
         "fixed_stars": star_hits,
-        "arabic_parts": {k: {**parts_placements[k], "house": parts_houses[k]} for k in parts},
+        # "house" kept alongside the new *_placidus/*_whole_sign pair (matching
+        # natal.points' existing shape, § "Whole Sign toggle") so anything still
+        # reading the old bare field -- including a chart row computed before
+        # this change -- keeps working rather than needing a backfill.
+        "arabic_parts": {k: {**parts_placements[k], "house": parts_houses[k],
+                              "house_placidus": parts_houses[k], "house_whole_sign": parts_houses_whole[k]} for k in parts},
         "harmonics": {str(h): {"positions": harmonics[h], "aspects": harmonics[f"{h}_aspects"]} for h in (5, 7, 9)},
         "balance": {"elements": elem_count, "modalities": mod_count},
     }

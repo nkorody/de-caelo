@@ -43,6 +43,28 @@ This is a personal reflective tool, not licensed legal, financial, or medical ad
 
 You will be given the natal chart, current transiting positions, transits to the natal chart, any stations or sign changes in the surrounding two weeks, and the current secondary progressions and solar arc directions. Use whatever is actually relevant to the question and ignore the rest.`;
 
+// Full-reading generation (§ "Replace hardcoded INTERP with per-user generated
+// readings") — this used to be a single hardcoded object in frontend/app.html,
+// written for one person's chart and shown unconditionally to every account.
+// This prompt/schema pair replaces it with one real per-user LLM call, run
+// once at onboarding, producing content in the exact shape the frontend
+// already reads.
+export const GENERATE_SYSTEM_PROMPT = `You are writing the full natal-chart reading for a specific person, using their real chart computed with the Swiss Ephemeris and supplied to you below. This is not a generic horoscope generator: every paragraph must be grounded in the specific data given -- name the actual sign, house, degree, dignity, or aspect driving what you write, not generic sign-trait copy.
+
+Tone: dry, direct, declarative. Write the way a technically literate astrologer would write a private reference document, not the way a horoscope app copywriter would. No em dashes. No "not X but Y" constructions. No mystical filler ("the universe is asking you to..."), no stacked qualifiers, no forced optimism. Each piece of text is two to five sentences.
+
+You are producing many separate pieces of text in one response, matching the exact structure requested: one overview paragraph synthesizing the whole chart, one paragraph per placement (planet/point) listed, one paragraph synthesizing essential dignities across the traditional seven, one paragraph for the modern dispositor chain and one for the traditional dispositor chain, one paragraph per fixed-star conjunction listed, one paragraph per Arabic Part listed, one paragraph per harmonic chart (5th, 7th, 9th), and one paragraph per natal aspect listed, in the exact order each list is given. Each piece stands alone -- assume the reader is looking at just that one paragraph next to that one placement or aspect, not reading start to finish, so never refer back to "as mentioned above" or forward to "as we'll see."`;
+
+// All ~20 points the frontend's INTERP.placements has always covered (§ same).
+// Filtered against natal.points at call time so a chart missing a point (it
+// shouldn't happen, but compute.py is the source of truth, not this list)
+// degrades to fewer paragraphs rather than a bad prompt.
+const PLACEMENT_NAMES = [
+  'Sun', 'Moon', 'Mercury', 'Venus', 'Mars', 'Jupiter', 'Saturn', 'Uranus', 'Neptune', 'Pluto',
+  'Chiron', 'North Node', 'South Node', 'Black Moon Lilith', 'Ascendant', 'Midheaven',
+  'Ceres', 'Pallas', 'Juno', 'Vesta',
+];
+
 function corsHeaders(origin){
   return {
     'Access-Control-Allow-Origin': origin || '*',
@@ -186,6 +208,111 @@ function buildChartContext(natal, prog, transits){
   return lines.join('\n');
 }
 
+// Builds the prompt context for a full readings generation, purely from
+// natal_json's already-computed structures (compute.py's compute_natal — no
+// new ephemeris math needed here). Returns the enumerated lists alongside the
+// prompt text because the Worker needs the exact same order again afterward,
+// to zip the model's positional arrays back into the frontend's keyed shapes.
+//
+// houseSystem picks which of compute.py's two parallel house computations
+// (§ "Whole Sign toggle with alternative readings") feeds every house-number
+// mention below -- 'placidus' (default, matches the original onboarding
+// generation) or 'whole_sign'. Everything else in the chart (signs, aspects,
+// dignities, dispositors) is house-system-invariant, so only the house
+// numbers threaded into PLACEMENTS and ARABIC PARTS below actually change;
+// the rest of the prompt, and the whole schema, stays identical either way.
+export function buildReadingsContext(natal, houseSystem = 'placidus'){
+  const houseField = houseSystem === 'whole_sign' ? 'house_whole_sign' : 'house_placidus';
+  const lines = [];
+  lines.push(`BIRTH: ${natal.birth.place}, ${natal.birth.month}/${natal.birth.day}/${natal.birth.year} ${natal.birth.hour}:${String(natal.birth.minute).padStart(2,'0')}`);
+  lines.push(`CHART RULER: Ascendant in ${natal.chart_ruler.asc_sign}, ruled by ${natal.chart_ruler.modern} (modern), ${natal.chart_ruler.traditional} (traditional)`);
+  lines.push(`SECT: ${natal.sect.is_day ? 'day' : 'night'} chart, sect light ${natal.sect.light}`);
+  lines.push(`HOUSE SYSTEM: ${houseSystem === 'whole_sign' ? 'Whole Sign' : 'Placidus'}`);
+
+  const placementNames = PLACEMENT_NAMES.filter(name => natal.points[name]);
+  lines.push('\nPLACEMENTS (one paragraph per entry, in this order):');
+  for(const name of placementNames){
+    const p = natal.points[name];
+    const houseStr = p[houseField] ? `, house ${p[houseField]}` : '';
+    lines.push(`${name}: ${fmtDeg(p.lon)}${houseStr}${p.retrograde ? ', retrograde' : ''}`);
+  }
+
+  lines.push('\nESSENTIAL DIGNITIES (traditional seven; synthesize into one paragraph):');
+  for(const [name, d] of Object.entries(natal.dignities || {})){
+    lines.push(`${name}: score ${d.score >= 0 ? '+' : ''}${d.score}, ${(d.tags || []).join(', ') || 'peregrine'}`);
+  }
+
+  lines.push('\nDISPOSITOR CHAIN, modern rulership (one paragraph):');
+  for(const [p, chain] of Object.entries(natal.dispositors?.modern?.chains || {})) lines.push(`${p} -> ${chain.join(' -> ')}`);
+  lines.push('\nDISPOSITOR CHAIN, traditional rulership (one paragraph):');
+  for(const [p, chain] of Object.entries(natal.dispositors?.traditional?.chains || {})) lines.push(`${p} -> ${chain.join(' -> ')}`);
+
+  const aspects = [...(natal.aspects || [])].sort((a, b) => a.orb - b.orb).slice(0, 20);
+  lines.push(`\nNATAL ASPECTS (${aspects.length}, one paragraph per entry, in this order):`);
+  aspects.forEach((a, i) => lines.push(`${i + 1}. ${a.p1} ${a.aspect} ${a.p2}, orb ${a.orb.toFixed(2)}°`));
+
+  const stars = natal.fixed_stars || [];
+  lines.push(`\nFIXED STAR CONJUNCTIONS (${stars.length}, one paragraph per entry, in this order):`);
+  stars.forEach((h, i) => lines.push(`${i + 1}. ${h.point} conjunct ${h.star}, orb ${h.orb.toFixed(2)}°`));
+
+  const partNames = Object.keys(natal.arabic_parts || {});
+  lines.push('\nARABIC PARTS (one paragraph per entry, in this order):');
+  for(const name of partNames){
+    const p = natal.arabic_parts[name];
+    // p.house is a pre-split-schema fallback (compute.py started emitting
+    // house_placidus/house_whole_sign together, see compute_natal) for any
+    // chart row computed before that change.
+    const houseNum = p[houseField] ?? p.house;
+    lines.push(`${name}: ${p.deg}°${String(p.min).padStart(2,'0')}' ${p.sign}, house ${houseNum}`);
+  }
+
+  lines.push('\nHARMONICS (one paragraph each for the 5th, 7th, and 9th harmonic chart):');
+  for(const h of [5, 7, 9]){
+    const hd = natal.harmonics?.[String(h)];
+    if(!hd){ lines.push(`${h}H: no data`); continue; }
+    const posStr = Object.entries(hd.positions || {}).map(([n, pp]) => `${n} ${pp.deg}°${String(pp.min).padStart(2,'0')}' ${pp.sign}`).join(', ');
+    const aspStr = (hd.aspects || []).slice(0, 8).map(a => `${a.p1} ${a.aspect} ${a.p2} (${a.orb.toFixed(2)}°)`).join(', ');
+    lines.push(`${h}H positions: ${posStr}`);
+    lines.push(`${h}H tightest aspects: ${aspStr || 'none within orb'}`);
+  }
+
+  return { text: lines.join('\n'), placementNames, aspects, stars, partNames };
+}
+
+// Structured-output schema for the call above. output_config.format requires
+// additionalProperties:false on every object, so it's built per-request from
+// the placement/part names actually present on this chart rather than
+// hardcoded (arabic_parts is a fixed 8 lots in practice, but derived here
+// rather than assumed).
+export function buildReadingsSchema(placementNames, partNames){
+  const str = { type: 'string' };
+  const placementProps = {}; for(const name of placementNames) placementProps[name] = str;
+  const partProps = {}; for(const name of partNames) partProps[name] = str;
+
+  return {
+    type: 'object',
+    additionalProperties: false,
+    required: ['overview', 'placements', 'dignitySynthesis', 'dispositorsModern', 'dispositorsTraditional', 'fixedStars', 'arabicParts', 'harmonic5', 'harmonic7', 'harmonic9', 'aspects'],
+    properties: {
+      overview: str,
+      placements: { type: 'object', additionalProperties: false, required: placementNames, properties: placementProps },
+      dignitySynthesis: str,
+      dispositorsModern: str,
+      dispositorsTraditional: str,
+      fixedStars: { type: 'array', items: str },
+      arabicParts: { type: 'object', additionalProperties: false, required: partNames, properties: partProps },
+      harmonic5: str,
+      harmonic7: str,
+      harmonic9: str,
+      aspects: { type: 'array', items: str },
+    },
+  };
+}
+
+// Mirrors app.html's aspectKey() exactly — the reassembled interp_json has to
+// use the identical key shape or findAspectInterp's lookups silently miss.
+export function aspectKey(p1, p2, aspect){ return [p1, p2].sort().join('|') + '|' + aspect; }
+
 // ---------- Supabase-backed request handling ----------
 async function verifyUser(request, env){
   const auth = request.headers.get('Authorization');
@@ -214,28 +341,106 @@ async function supaInsert(env, jwt, table, row){
   });
 }
 
-export default {
-  async fetch(request, env) {
-    const origin = request.headers.get('Origin');
+// Shared by the /generate-readings route below and the local backfill script
+// (imported directly from there) so the two can't drift into two different
+// bugs, the way max_tokens already did once. Throws on any failure; callers
+// decide how to surface that (HTTP response here, a logged "FAILED" line in
+// the backfill script).
+export async function generateReadings(natal, apiKey, houseSystem = 'placidus') {
+  const { text: chartContext, placementNames, aspects, stars, partNames } = buildReadingsContext(natal, houseSystem);
+  const schema = buildReadingsSchema(placementNames, partNames);
 
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders(origin) });
-    }
-    if (request.method !== 'POST') {
-      return new Response('Method not allowed', { status: 405, headers: corsHeaders(origin) });
-    }
+  const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-sonnet-5',
+      // 8192 truncated a real response mid-string (adaptive thinking plus a
+      // ~10-section, ~50-field structured JSON output can run past that) --
+      // reproduced live, not hypothetical. 16000 matches the ceiling already
+      // used for the (much shorter) chat endpoint elsewhere in this file.
+      max_tokens: 16000,
+      output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+      system: GENERATE_SYSTEM_PROMPT,
+      messages: [{ role: 'user', content: 'CHART DATA:\n\n' + chartContext }],
+    }),
+  });
 
-    if (env.CHAT_ACCESS_KEY) {
-      const provided = request.headers.get('X-Chat-Key');
-      if (provided !== env.CHAT_ACCESS_KEY) return jsonResponse({ error: 'unauthorized' }, 401, origin);
-    }
-    if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
-      return jsonResponse({ error: 'server misconfigured: missing ANTHROPIC_API_KEY / SUPABASE_URL / SUPABASE_ANON_KEY' }, 500, origin);
-    }
+  if (!apiRes.ok) {
+    throw new Error(`Anthropic API error ${apiRes.status}: ${(await apiRes.text()).slice(0, 500)}`);
+  }
 
-    const user = await verifyUser(request, env);
-    if (!user) return jsonResponse({ error: 'unauthorized: invalid or missing session' }, 401, origin);
+  const data = await apiRes.json();
+  const textBlock = (data.content || []).find(b => b.type === 'text');
+  if (!textBlock || !textBlock.text) {
+    throw new Error(`empty structured response, stop_reason=${data.stop_reason}`);
+  }
 
+  let parsed;
+  try { parsed = JSON.parse(textBlock.text); }
+  catch (e) {
+    // A parse failure here almost always means the response was truncated
+    // mid-string -- stop_reason distinguishes that from a genuinely malformed
+    // response, which output_config.format's schema enforcement should
+    // otherwise rule out.
+    throw new Error(`unparseable structured response (stop_reason=${data.stop_reason}): ${e.message}`);
+  }
+
+  // Reassemble the two positionally-ordered arrays into the exact
+  // `${point}|${star}` / aspectKey() shapes app.html's INTERP.fixedStars
+  // and INTERP.aspects already use — see file header comment on why the
+  // model isn't asked to produce these compound keys itself.
+  const fixedStars = {};
+  stars.forEach((h, i) => { if (parsed.fixedStars[i] !== undefined) fixedStars[`${h.point}|${h.star}`] = parsed.fixedStars[i]; });
+  const aspectsOut = {};
+  aspects.forEach((a, i) => { if (parsed.aspects[i] !== undefined) aspectsOut[aspectKey(a.p1, a.p2, a.aspect)] = parsed.aspects[i]; });
+
+  return {
+    overview: parsed.overview,
+    placements: parsed.placements,
+    dignitySynthesis: parsed.dignitySynthesis,
+    dispositors: { modern: parsed.dispositorsModern, traditional: parsed.dispositorsTraditional },
+    fixedStars,
+    arabicParts: parsed.arabicParts,
+    harmonics: { '5': parsed.harmonic5, '7': parsed.harmonic7, '9': parsed.harmonic9 },
+    aspects: aspectsOut,
+  };
+}
+
+// /generate-readings — full-chart reading generation. Called once from
+// onboarding.js right after /compute-chart resolves (Placidus, the default),
+// and again later from app.html's house-system toggle the first time a user
+// switches to Whole Sign (§ "Whole Sign toggle with alternative readings") --
+// same route, same shape, just a second houseSystem value and a different
+// caller. Same key-holder, same JWT-verified-user gate as chat; the
+// difference is the request carries the natal chart directly (both callers
+// already have it in memory — no round trip through Supabase needed) and the
+// response is meant to be merged into a `charts` row by the caller, not
+// stored here.
+async function handleGenerateReadings(request, env, origin, user) {
+  let body;
+  try { body = await request.json(); }
+  catch (e) { return jsonResponse({ error: 'invalid JSON body' }, 400, origin); }
+
+  const natal = body.natal;
+  if (!natal || !natal.points) return jsonResponse({ error: 'missing natal chart data' }, 400, origin);
+
+  const houseSystem = body.houseSystem === 'whole_sign' ? 'whole_sign' : 'placidus';
+
+  try {
+    const interp = await generateReadings(natal, env.ANTHROPIC_API_KEY, houseSystem);
+    return jsonResponse({ interp }, 200, origin);
+  } catch (e) {
+    console.error('generate-readings failed:', String(e).slice(0, 1000));
+    return jsonResponse({ error: 'generation failed', detail: String(e).slice(0, 500) }, 502, origin);
+  }
+}
+
+async function handleChat(request, env, origin, user) {
     let body;
     try { body = await request.json(); }
     catch (e) { return jsonResponse({ error: 'invalid JSON body' }, 400, origin); }
@@ -328,5 +533,38 @@ export default {
     } catch (e) {
       return jsonResponse({ error: 'worker exception', detail: String(e).slice(0, 500) }, 500, origin);
     }
+}
+
+export default {
+  async fetch(request, env) {
+    const origin = request.headers.get('Origin');
+
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
+    if (request.method !== 'POST') {
+      return new Response('Method not allowed', { status: 405, headers: corsHeaders(origin) });
+    }
+
+    if (env.CHAT_ACCESS_KEY) {
+      const provided = request.headers.get('X-Chat-Key');
+      if (provided !== env.CHAT_ACCESS_KEY) return jsonResponse({ error: 'unauthorized' }, 401, origin);
+    }
+    if (!env.ANTHROPIC_API_KEY || !env.SUPABASE_URL || !env.SUPABASE_ANON_KEY) {
+      return jsonResponse({ error: 'server misconfigured: missing ANTHROPIC_API_KEY / SUPABASE_URL / SUPABASE_ANON_KEY' }, 500, origin);
+    }
+
+    const user = await verifyUser(request, env);
+    if (!user) return jsonResponse({ error: 'unauthorized: invalid or missing session' }, 401, origin);
+
+    // Path-based routing on the same Worker/deploy/secrets rather than a
+    // second Worker — this file's header comment states it's deliberately
+    // the only thing that touches ANTHROPIC_API_KEY; that invariant holds by
+    // adding a route here instead of a new key-holder.
+    const path = new URL(request.url).pathname;
+    if (path === '/generate-readings') {
+      return handleGenerateReadings(request, env, origin, user);
+    }
+    return handleChat(request, env, origin, user);
   },
 };

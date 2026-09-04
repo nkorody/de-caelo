@@ -99,6 +99,7 @@ for star in FIXED_STARS:
 parts = arabic_parts(ASC, lons['Sun'], lons['Moon'], lons['Mercury'], lons['Venus'], lons['Mars'], lons['Jupiter'], lons['Saturn'], is_day)
 parts_placements = {k: deg_to_sign(v) for k, v in parts.items()}
 parts_houses = {k: house_of(v, cusps_p) for k, v in parts.items()}
+parts_houses_whole = {k: house_of(v, cusps_w) for k, v in parts.items()}
 
 # ---- Harmonics (5H, 7H, 9H) ----
 harmonic_lons_base = {k: v for k, v in lons.items() if k in list(BODIES.keys()) + ['South Node','Ascendant','Midheaven']}
@@ -140,7 +141,8 @@ natal = {
     'dispositors': {'modern': {'map': disp_modern, 'chains': chains_modern},
                      'traditional': {'map': disp_trad, 'chains': chains_trad}},
     'fixed_stars': star_hits,
-    'arabic_parts': {k: {**parts_placements[k], 'house': parts_houses[k]} for k in parts},
+    'arabic_parts': {k: {**parts_placements[k], 'house': parts_houses[k],
+                          'house_placidus': parts_houses[k], 'house_whole_sign': parts_houses_whole[k]} for k in parts},
     'harmonics': {str(h): {'positions': harmonics[h], 'aspects': harmonics[f'{h}_aspects']} for h in [5,7,9]},
     'balance': {'elements': elem_count, 'modalities': mod_count},
 }

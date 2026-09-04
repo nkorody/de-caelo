@@ -131,8 +131,25 @@ birthForm.addEventListener('submit', async (e) => {
     const { error: offsetErr } = await supabase.from('birth_data').update({ utc_offset: natal.birth.utc_offset }).eq('user_id', user.id);
     if(offsetErr) throw offsetErr;
 
+    // Full-chart readings, generated once here rather than shown from the old
+    // hardcoded single-chart INTERP constant (see worker/chat-worker.js's
+    // /generate-readings route). Non-blocking: a failed or slow generation
+    // call must not prevent account creation -- interp_json is nullable and
+    // every render site already degrades gracefully when it's empty, so a
+    // null here just means thinner content until a retry/backfill.
+    let interp = null;
+    try{
+      const { data: { session } } = await supabase.auth.getSession();
+      const readingsRes = await fetch(cfg.CHAT_ENDPOINT + '/generate-readings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.access_token },
+        body: JSON.stringify({ natal }),
+      });
+      if(readingsRes.ok){ interp = (await readingsRes.json()).interp || null; }
+    } catch(readingsErr){ /* non-blocking, see comment above */ }
+
     const { error: chartErr } = await supabase.from('charts').upsert({
-      user_id: user.id, natal_json: natal, prog_json: progressions, computed_at: new Date().toISOString(),
+      user_id: user.id, natal_json: natal, prog_json: progressions, interp_json: interp, computed_at: new Date().toISOString(),
     });
     if(chartErr) throw chartErr;
 

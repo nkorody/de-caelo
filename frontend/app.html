@@ -251,11 +251,12 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 </div>
 <div id="app" style="display:none;">
   <button id="oracleToggle" class="oracle-fab">Ask &#8599;</button>
+  <button id="houseSystemToggle" class="hsys-toggle" title="Switch between Placidus and Whole Sign houses">Houses: Placidus</button>
   <div class="tabs" id="tabs"></div>
   <div class="chart-subnav" id="chartSubnav" style="display:none;"></div>
   <div id="panels"></div>
   <div class="footnote">
-    Positions from the Swiss Ephemeris (JPL DE-derived), including the full fixed-star catalog. Transit and horoscope data run 2024 to 2034 daily. Progressions and solar arc compute live for any date, age 0 to 105, using the day-for-a-year method. Houses are Placidus, with whole-sign shown alongside. Reload periodically to extend the transit window past 2034.
+    Positions from the Swiss Ephemeris (JPL DE-derived), including the full fixed-star catalog. Transit and horoscope data run 2024 to 2034 daily. Progressions and solar arc compute live for any date, age 0 to 105, using the day-for-a-year method. Houses default to Placidus; switch to Whole Sign with the toggle above the tabs -- the wheel, every house number, and the generated readings all switch with it. Both systems are always shown side by side in the Placements table. Reload periodically to extend the transit window past 2034.
   </div>
 </div>
 
@@ -274,6 +275,10 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 <style>
   .oracle-fab{position:fixed; bottom:20px; right:20px; z-index:150; font-family:var(--mono); font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:11px 18px; background:var(--paper); color:var(--ink); border:2px solid var(--paper); cursor:pointer; font-weight:700;}
   .oracle-fab:hover{background:var(--ink); color:var(--paper);}
+  .hsys-toggle{position:fixed; top:16px; right:16px; z-index:150; font-family:var(--mono); font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; padding:8px 13px; background:var(--ink); color:var(--paper); border:2px solid var(--paper); cursor:pointer; font-weight:700;}
+  .hsys-toggle:hover{background:var(--paper); color:var(--ink);}
+  .hsys-toggle:disabled{opacity:0.5; cursor:wait;}
+  @media (max-width:640px){ .hsys-toggle{top:8px; right:8px; padding:6px 10px; font-size:9.5px;} }
   .scrim{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:190; display:none;}
   .scrim.show{display:block;}
   .oracle-drawer{position:fixed; top:0; right:-420px; width:400px; max-width:92vw; height:100%; background:var(--ink); border-left:3px solid var(--paper); z-index:200; transition:right .25s ease; display:flex; flex-direction:column;}
@@ -302,6 +307,13 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 const SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
 const SIGN_GLYPH = {'Aries':'\u2648','Taurus':'\u2649','Gemini':'\u264A','Cancer':'\u264B','Leo':'\u264C','Virgo':'\u264D','Libra':'\u264E','Scorpio':'\u264F','Sagittarius':'\u2650','Capricorn':'\u2651','Aquarius':'\u2652','Pisces':'\u2653'};
 const BODY_GLYPH = {'Sun':'\u2609','Moon':'\u263D','Mercury':'\u263F','Venus':'\u2640','Mars':'\u2642','Jupiter':'\u2643','Saturn':'\u2644','Uranus':'\u2645','Neptune':'\u2646','Pluto':'\u2647','Chiron':'\u26B7','North Node':'\u260A','South Node':'\u260B','Ascendant':'AC','Midheaven':'MC'};
+
+// Whole Sign / Placidus toggle (§ "Whole Sign toggle with alternative
+// readings"). Set once at bootstrap from profiles.house_system, and again on
+// each toggle click (see the bootstrap script's houseSystemToggle handler,
+// which then reloads the page so every panel below re-renders against the
+// new value rather than needing its own live-update path).
+let HOUSE_SYSTEM = 'placidus';
 
 function norm360(x){ x = x % 360; return x < 0 ? x + 360 : x; }
 function angularSep(a,b){ const d = Math.abs(norm360(a)-norm360(b)); return Math.min(d, 360-d); }
@@ -335,6 +347,25 @@ function houseOf(lon, cusps){
     else { if(lon>=start || lon<end) return i+1; }
   }
   return 12;
+}
+
+// House-system-aware accessors, used everywhere a house number or cusp set
+// is shown as "the" house/cusps rather than as an explicit side-by-side
+// comparison (the Placements table's House (P)/House (W) columns stay
+// unconditional -- they're a reference table, not a "current system" read).
+function activeCusps(natal){
+  return (HOUSE_SYSTEM==='whole_sign' ? natal.houses_whole_sign : natal.houses_placidus).cusps;
+}
+function pointHouse(p){
+  if(!p) return null;
+  return HOUSE_SYSTEM==='whole_sign' ? p.house_whole_sign : p.house_placidus;
+}
+// arabic_parts entries predate the house_placidus/house_whole_sign split
+// (see compute.py's compute_natal); p.house is a Placidus-only fallback for
+// any chart row computed before that change.
+function partHouse(p){
+  if(!p) return null;
+  return pointHouse(p) ?? p.house ?? null;
 }
 
 // Cross-set aspects: transiting bodies (dict name->lon) vs natal points (dict name->lon)
@@ -496,6 +527,19 @@ const NATAL_DOMAIN = {
   Juno:'your capacity for committed partnership', Vesta:'what you devote yourself to',
   Vertex:'your point of fated encounter',
 };
+// Progressions move the whole chart forward at one day per year of life, so
+// the outer planets barely shift in a lifetime -- when they do progress into
+// a new aspect at all, it's rare enough to flag as such, rather than describe
+// with the same everyday language as a fast body like the Moon or Sun.
+const PROGRESSION_THEME = {
+  Sun:'identity maturing into its next phase', Moon:'a shift in emotional needs and instinctive footing',
+  Mercury:'a shift in how thinking and communication operate', Venus:'a shift in what is valued and how affection moves',
+  Mars:'a shift in how drive and assertion get expressed', Jupiter:'a slow, rare expansion of belief or opportunity',
+  Saturn:'a slow, rare structural test or consolidation', Uranus:'an exceptionally rare, generational-scale shift',
+  Neptune:'an exceptionally rare shift in imagination or ideal', Pluto:'an exceptionally rare shift in power or transformation',
+  Ascendant:'a shift in outward manner and how the self is presented', Midheaven:'a shift in vocation or public direction',
+};
+const HARMONIC_THEME = {5:'creative and talent-related', 7:'inspirational, imaginative, or dissolving', 9:'about completion and belief'};
 const ASPECT_MODE = {
   Conjunction:'merges directly with', Opposition:'pulls against, in open tension with',
   Square:'grinds against, forcing action from', Trine:'flows easily with, lending support to',
@@ -508,12 +552,21 @@ const HOUSE_DOMAIN = {
   10:'career, reputation, and public direction', 11:'community, networks, and long-term goals', 12:'the unconscious, retreat, and what is hidden',
 };
 
-const ANGLE_HOUSE = {'Ascendant':1, 'Descendant':7, 'Midheaven':10, 'Imum Coeli':4};
+// The four angles (and the Vertex) carry no house_placidus/house_whole_sign
+// field of their own -- compute.py's compute_natal deliberately excludes
+// them from the houses dict it builds for natal.points -- so their house has
+// to be computed directly from natal.angles against the active cusps. This
+// also fixes a latent Whole Sign bug a hardcoded Placidus map would have
+// had: in Placidus, MC/IC always fall exactly on the 10th/4th cusp by
+// definition, but in Whole Sign they generally don't (a well-known feature
+// of the system, not an edge case) -- ASC/DSC alone stay pinned to houses
+// 1/7 under both systems.
+const ANGLE_LON = {'Ascendant':'ASC', 'Descendant':'DSC', 'Midheaven':'MC', 'Imum Coeli':'IC', 'Vertex':'Vertex'};
 function houseFor(name, natal){
-  if(ANGLE_HOUSE[name]!==undefined) return ANGLE_HOUSE[name];
+  const angleKey = ANGLE_LON[name];
+  if(angleKey!==undefined) return houseOf(natal.angles[angleKey], activeCusps(natal));
   const p = natal.points[name];
-  if(p && p.house_placidus) return p.house_placidus;
-  if(name==='Vertex') return houseOf(natal.points['Vertex'].lon, natal.houses_placidus.cusps);
+  if(p) return pointHouse(p) ?? null;
   return null;
 }
 function natalPointLabel(name, natal){
@@ -636,13 +689,86 @@ function describeEcho(ad, a){
   return ` This mirrors ${weekdayShort(crossing.date)}, ${niceDate(crossing.date)} ${crossing.date.slice(0,4)}, about ${ago} \u2014 the same contact, exact then too.`;
 }
 
+// ---------- PROGRESSION / SOLAR ARC TIMING ----------
+// Same signed-orb zero-crossing technique findExactCrossing() above uses for
+// transits (daily samples), walked over yearly progression samples instead --
+// progressions/solar arc move by one day of ephemeris motion per year of
+// life, so "exact" here means an age, not a date. Returns every crossing
+// across the precomputed 0..maxAge table (a body like the Moon can cross the
+// same natal aspect several times in a lifetime; slower bodies 0 or 1 times).
+function progressionCrossings(lonArr, natalLon, aspectAngle, maxAge){
+  const out = [];
+  const signedOrb = age => angularSep(lonArr[age], natalLon) - aspectAngle;
+  let prev = signedOrb(0);
+  for(let age=1; age<=maxAge; age++){
+    const cur = signedOrb(age);
+    if((prev<0)!==(cur<0)) out.push(age-1 + prev/(prev-cur));
+    prev = cur;
+  }
+  return out;
+}
+function nearestProgressionCrossing(lonArr, natalLon, aspectAngle, maxAge, currentAge){
+  const crossings = progressionCrossings(lonArr, natalLon, aspectAngle, maxAge);
+  if(!crossings.length) return null;
+  crossings.sort((x,y)=>Math.abs(x-currentAge)-Math.abs(y-currentAge));
+  return crossings[0];
+}
+function ageTiming(exactAge, currentAge){
+  const diff = exactAge - currentAge;
+  if(Math.abs(diff) < 0.1) return 'Exact right now';
+  const yrs = Math.abs(diff).toFixed(1);
+  return diff > 0 ? `Exact at age ${exactAge.toFixed(1)}, about ${yrs} years from now` : `Exact at age ${exactAge.toFixed(1)}, about ${yrs} years ago`;
+}
+function progressedLonArr(ad, name){
+  return ad.progressions.lon[name] || (name==='Ascendant' ? ad.progressions.ascendant : (name==='Midheaven' ? ad.progressions.midheaven : null));
+}
+// Solar arc has no precomputed per-point table (compute.py's build_progressions
+// only stores secondary-progression longitudes) -- derive one: every natal
+// point advanced by the same arc the progressed Sun has moved, at each age.
+function buildSolarArcSeries(ad){
+  const sunProg = ad.progressions.lon['Sun'], natalSun = ad.natalLons['Sun'];
+  const out = {};
+  for(const name in ad.natalLons){
+    const arr = [];
+    for(let age=0; age<=ad.progressions.max_age; age++) arr.push(norm360(ad.natalLons[name] + norm360(sunProg[age]-natalSun)));
+    out[name] = arr;
+  }
+  return out;
+}
+function domainFor(name, natal){
+  if(NATAL_DOMAIN[name]) return NATAL_DOMAIN[name];
+  const h = houseFor(name, natal);
+  return h ? HOUSE_DOMAIN[h] : 'this part of the chart';
+}
+function describeProgressedAspect(ad, a, currentAge){
+  const natal = ad.natal;
+  const mode = ASPECT_MODE[a.aspect] || 'contacts';
+  const theme = PROGRESSION_THEME[a.transiting] || 'a slow internal development';
+  const lonArr = progressedLonArr(ad, a.transiting);
+  const exactAge = lonArr ? nearestProgressionCrossing(lonArr, ad.natalLons[a.natal], ASPECT_ANGLE[a.aspect], ad.progressions.max_age, currentAge) : null;
+  const timing = exactAge!==null ? ` ${ageTiming(exactAge, currentAge)}.` : '';
+  return `Progressed ${a.transiting} ${mode} natal ${natalPointLabel(a.natal, natal)}, orb ${a.orb.toFixed(2)}\u00b0.${timing} Progressions move the chart itself over years, not days, so this reflects ${theme}, now bearing directly on ${domainFor(a.natal, natal)}.`;
+}
+function describeSolarArcAspect(ad, a, currentAge, arcSeries){
+  const natal = ad.natal;
+  const mode = ASPECT_MODE[a.aspect] || 'contacts';
+  const lonArr = arcSeries[a.transiting];
+  const exactAge = lonArr ? nearestProgressionCrossing(lonArr, ad.natalLons[a.natal], ASPECT_ANGLE[a.aspect], ad.progressions.max_age, currentAge) : null;
+  const timing = exactAge!==null ? ` ${ageTiming(exactAge, currentAge)}.` : '';
+  return `Directed ${a.transiting} ${mode} natal ${natalPointLabel(a.natal, natal)}, orb ${a.orb.toFixed(2)}\u00b0.${timing} Solar arc advances every natal point by the arc the progressed Sun has moved; natal ${a.transiting}'s significance is now activating ${domainFor(a.natal, natal)}.`;
+}
+function describeHarmonicAspect(a, h){
+  const mode = ASPECT_MODE[a.aspect] || 'contacts';
+  return `${a.p1} ${mode} ${a.p2} in the ${h}th harmonic, orb ${a.orb.toFixed(2)}\u00b0.`;
+}
+
 function dailyReport(ad, dateStr){
   dateStr = ad.clampDate(dateStr);
   const idx = ad.indexFor(dateStr);
   const pos = ad.positionsAt(idx);
   const moon = ad.moonPhase(idx);
   const moonSign = degToSign(pos['Moon']);
-  const moonHouse = houseOf(pos['Moon'], ad.natal.houses_placidus.cusps);
+  const moonHouse = houseOf(pos['Moon'], activeCusps(ad.natal));
   const aspects = transitAspects(pos, ad.natalLons).filter(a=>a.transiting!=='South Node');
   const top = aspects.slice(0,6).map(a=>({...a, idx}));
   const stations = ad.stationsBetween(Math.max(0,idx-1), Math.min(ad.transits.dates.length-1, idx+1));
@@ -768,12 +894,12 @@ function monthlyReport(ad, monthStr){ // 'YYYY-MM'
   if(progAspects.length){
     lines.push('');
     lines.push('Progressions in effect this year:');
-    progAspects.forEach(a=>lines.push(`\u2022 Progressed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0.`));
+    progAspects.forEach(a=>lines.push(`\u2022 Progressed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0 \u2014 touching ${domainFor(a.natal, ad.natal)}.`));
   }
   if(saAspects.length){
     lines.push('');
     lines.push('Solar arc directions in effect this year:');
-    saAspects.forEach(a=>lines.push(`\u2022 Directed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0.`));
+    saAspects.forEach(a=>lines.push(`\u2022 Directed ${a.transiting} ${ASPECT_MODE[a.aspect]} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0 \u2014 touching ${domainFor(a.natal, ad.natal)}.`));
   }
 
   return {month:monthStr, aspects:monthAspects, ingresses, stations, lunations, progAspects, saAspects, age:sa.age, solarArc:sa.arcDeg, text: lines.join('\n')};
@@ -854,24 +980,35 @@ function buildWheelSVG(natal){
   svg.push(`<circle cx="${cx}" cy="${cy}" r="${rInner}" fill="${WC.panelInner}" stroke="${WC.brass}" stroke-width="1"/>`);
   svg.push(`<circle cx="${cx}" cy="${cy}" r="${rInner-5}" fill="none" stroke="${WC.brassDim}" stroke-width="0.5"/>`);
 
-  // house cusps
-  const cusps = natal.houses_placidus.cusps;
-  const angleNames = {0:'AC',3:'IC',6:'DC',9:'MC'};
+  // house cusps (Placidus or Whole Sign, per HOUSE_SYSTEM) -- every cusp
+  // drawn the same grey-dashed way. The four angles are drawn separately,
+  // below, from their exact longitude rather than picked out by cusp index:
+  // in Placidus the angles coincide exactly with cusps 1/4/7/10 by
+  // definition, but in Whole Sign they generally fall inside a house rather
+  // than on any cusp line (ASC/DSC land near, not on, the 1st/7th boundary;
+  // MC/IC can land almost anywhere), so a single index-based rule can't
+  // describe both systems correctly.
+  const cusps = activeCusps(natal);
   for(let i=0;i<12;i++){
     const lon = cusps[i];
-    const isAngle = (i===0||i===3||i===6||i===9);
     const [x1,y1] = pt(lon, rHouseIn);
     const [x2,y2] = pt(lon, rHouseOut);
-    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${isAngle?WC.red:WC.brass}" stroke-width="${isAngle?1.9:0.9}" stroke-dasharray="${isAngle?'none':'2,2'}"/>`);
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${WC.brass}" stroke-width="0.9" stroke-dasharray="2,2"/>`);
     const nextLon = cusps[(i+1)%12];
     const midLon = norm360(lon + norm360(nextLon-lon)/2);
     const [lx,ly] = pt(midLon, rHouseIn-16);
     svg.push(`<text x="${lx}" y="${ly}" text-anchor="middle" dominant-baseline="central" font-size="12" font-weight="bold" fill="${WC.brass}" font-family="serif">${i+1}</text>`);
-    if(isAngle){
-      const [ax,ay] = pt(lon, rOuter+22);
-      svg.push(`<text x="${ax}" y="${ay}" text-anchor="middle" dominant-baseline="central" font-size="13" fill="${WC.redBright}" font-family="serif" font-weight="bold">${angleNames[i]}</text>`);
-    }
   }
+
+  // the four angles, from their exact longitude, always red/solid and drawn
+  // on top of the cusp grid above
+  [['AC',natal.angles.ASC], ['IC',natal.angles.IC], ['DC',natal.angles.DSC], ['MC',natal.angles.MC]].forEach(([label,lon])=>{
+    const [x1,y1] = pt(lon, rHouseIn);
+    const [x2,y2] = pt(lon, rHouseOut);
+    svg.push(`<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${WC.red}" stroke-width="1.9"/>`);
+    const [ax,ay] = pt(lon, rOuter+22);
+    svg.push(`<text x="${ax}" y="${ay}" text-anchor="middle" dominant-baseline="central" font-size="13" fill="${WC.redBright}" font-family="serif" font-weight="bold">${label}</text>`);
+  });
 
   // aspect lines (within inner circle)
   const wheelSet = new Set(WHEEL_BODIES);
@@ -1085,129 +1222,10 @@ function wireSkyInteraction(container, natal, onSelect){
 
 </script>
 <script>
-const INTERP = {
-
-overview: `The chart rules from a hidden room. Cancer rises, giving a first impression that is protective, absorbent, attuned to the emotional temperature of a room before a word is spoken. But the Ascendant's ruler, the Moon, sits peregrine in Gemini in the 12th house: the actual engine of selfhood runs in private, sorting experience into language, away from an audience. What looks like a protective persona from outside is, from inside, a front door to a self that does most of its living in solitude, on the page.
-
-The Sun, exalted in Aries and further strengthened by day-triplicity, gives real confidence and directness, but it sits in the 11th house, so identity organizes around causes, futures, and the company of the like-minded rather than one-to-one intimacy. That solar confidence is also combust, held within five degrees of a retrograde Mercury: the will and the mind move together almost involuntarily, and the retrograde Mercury means the outward voice is a revised voice, not a first draft. This is a chart built for editing, in the literal sense, before it is built for anything else.
-
-Saturn is the chart's real center of gravity: domicile in Aquarius, further strengthened by day-triplicity, the single most dignified planet here, sitting in the 8th house of shared resources and structural transformation. Mars, by contrast, is the weakest thing in the chart, in its classical Fall in Cancer, tucked into the same hidden 12th house as the Moon and Venus, though conjunct the Ascendant itself, so its usually-buried force is nonetheless the first thing registered on meeting the person. Between them, Saturn's structural authority and Mars's private intensity are the two poles this chart has to keep reconciling.
-
-The dispositor chains close on themselves twice: once in a locked loop of Mars, Moon, and Mercury (absorbing Sun, Venus, and Jupiter along with them), and once in a locked loop of Saturn and Uranus (absorbing Neptune). Pluto, dignified in its own modern sign, answers only to itself. Under the traditional rulerships Nicholas already asked about, Saturn stands alone as sole final dispositor of the outer, structural material, while Pluto folds into the instinct-feeling-thought loop instead of standing apart. Both versions agree on the essential shape: this is a chart with real autonomy at its edges and total interdependence at its emotional core.`,
-
-placements: {
-  'Sun': `Exalted in Aries and further dignified by day-triplicity, this is a genuinely confident placement, the will acting before it deliberates. Set in the 11th house, that confidence isn't staged for a lover or a family; it organizes around groups, causes, and shared futures, identity built through what gets made with others rather than through domestic mirroring. The Sun is also combust, sitting under five degrees from Mercury: thinking and self-assertion arrive fused, with no clean separation between "just having an idea" and "being seen to have it." Since that Mercury is retrograde, the fusion comes pre-edited. Confidence here has already been revised before it goes public.`,
-
-  'Moon': `The Moon rules the Ascendant, so the whole chart answers to what it's doing, and what it's doing is running peregrine, with no essential dignity, in Gemini, in the 12th house. Peregrine doesn't mean weak. It means unanchored, taking its cues from context and aspect rather than an inborn home-court advantage. Gemini asks the emotional instrument to metabolize feeling by naming it, sorting experience through language rather than simply sitting inside it. The 12th house is where this happens, not in company but alone, through writing, through institutional or solitary work that doesn't require being watched doing it. Because this Moon also rules the rising sign, the entire outward persona, protective and attuned as Cancer makes it look, is really a door onto a self built in private.`,
-
-  'Mercury': `Retrograde at birth, and combust, sitting under five degrees from the Sun. This is a real signature, not a passing transit: a mind that reviews before it transmits. Aries wants the blunt, immediate, first-instinct sentence; retrograde and combustion both intercept that impulse, producing someone who often knows the sharper version of a line and deliberately withholds it, revising toward precision instead of speed. The house is the 10th, meaning this isn't a private tic, it's the actual professional instrument. Editing, in the strict sense, is what a retrograde, combust Mercury in Aries in the house of vocation is built to do well.`,
-
-  'Venus': `Peregrine in Gemini, in the 12th house, and conjunct the Moon almost exactly. Affection and lunar need aren't separate functions here, they're nearly one signal. Gemini Venus loves through conversation and curiosity about a person rather than static devotion; the 12th keeps most of that expression unspoken, care given quietly, aesthetic pleasure taken without an audience. The tight Moon conjunction means what makes this person feel safe and what makes them fall for someone are, in practice, close to indistinguishable.`,
-
-  'Mars': `In its classical Fall here, Cancer being the sign directly opposite Mars's exaltation in Capricorn. This is the single most afflicted placement in the chart by essential dignity, and Cancer specifically asks assertion to go indirect: anger becomes withdrawal, hurt, or pre-emptive protection rather than confrontation. The 12th house compounds it, force operating below the threshold of conscious display until it surfaces as exhaustion or crisis rather than a clean fight. And yet this same Mars sits almost exactly on the Ascendant. The force that feels buried and indirect from the inside is often the very first thing another person registers on meeting you.`,
-
-  'Jupiter': `Peregrine in Leo, warm and inclined toward generosity and creative confidence without any inherent dignity backing it up. Set in the 2nd house, that expansiveness attaches to money and self-worth directly: a belief that abundance is available and that talent has real market value. The wide square from the Sun is worth naming honestly, since confidence here can outrun what current resources actually support. Not a flaw to correct so much as a tendency to check against the ledger occasionally.`,
-
-  'Saturn': `Domicile in Aquarius and, this being a day chart, also holding day-triplicity rulership of Air. This is the most dignified planet in the entire chart, structurally at home in exactly the way Aquarius wants: systems, principle, long-range architecture, discipline that is impersonal rather than sentimental. The 8th house is where it operates, other people's resources, shared structures, inheritance, what gets transformed rather than simply held. A Saturn this strong here indicates real, earned authority over what is buried or joint, someone trusted with stakes that aren't only their own. Its near-exact sextile to Black Moon Lilith is a genuine asset: the wildest, least tameable part of the self and the most disciplined part of the self are in active cooperation rather than at war.`,
-
-  'Uranus': `In Capricorn, a generational placement shared by the whole cohort, individuating through slow, structural rebellion rather than sudden rupture for its own sake: dismantling and rebuilding outmoded forms rather than simply breaking them. Set in the 7th house, that current runs specifically through partnership, relationships that arrive suddenly, ask for unconventional terms, or periodically demand real independence within commitment. Conjunct the fixed star Vega, encounters with significant others carry a genuinely magnetic, almost hypnotic charge, charisma that can appear outsized and arrive without warning.`,
-
-  'Neptune': `Also in Capricorn in the 7th, close enough to Uranus to share its house and sign context. Neptune's specific signature is idealization, a haze over partnership and open commitment, the tendency to see a partner as more than, or other than, what they actually are, especially early on. Worth stating plainly since it's the most common site of disappointment for this placement: not a character flaw, a structural feature, best handled by building in time and evidence before commitment rather than distrusting the pull itself.`,
-
-  'Pluto': `Domicile by modern rulership in Scorpio, meaning its intensity here is concentrated and largely unfiltered. Set in the 5th house of creativity, romance, and self-expression, that concentrated charge doesn't stay backgrounded, it shows up directly in what gets made and who gets loved: creative work with real stakes, romantic involvement that is rarely casual. Its near-exact conjunction to the fixed star Zuben Eschamali, traditionally associated with fortune and vindication, adds an unusual thread to Pluto's normal all-or-nothing character: intensity that tends, over time, toward being proven right rather than merely feared.`,
-
-  'Chiron': `Sitting almost exactly at the degree of the Gemini twins, conjunct both Castor, traditionally Mercury-natured, and Pollux, traditionally Mars-natured. In the 1st house in Cancer, the original wound is bound up with a felt duality present from the start: quickness and articulateness on one side, exposure to force or conflict on the other, the two not well integrated at the time of the injury. The near-exact trine to the Midheaven is one of the tightest contacts in the whole chart: the wound is wired directly into vocation. Helping others work with exactly this split, mind against force, articulateness against exposure, isn't incidental to the career this chart supports. It's close to the career's actual raw material.`,
-
-  'North Node': `The growth axis runs from Cancer to Capricorn, 1st house to 7th. The default, comfortable mode (Cancer, South Node) is self-protection and a private, self-referencing identity; the direction of growth (Capricorn, North Node, in the 7th, ruled by the chart's most dignified planet) is public accountability and structural achievement built through real partnership with an equal, not a projection. The South Node's near-exact conjunction to the martial fixed star Pollux suggests the well-worn default often dresses defensive readiness up as protection. The way through isn't to abandon depth, it's to route it outward into structures and partnerships built to hold it.`,
-
-  'South Node': `See North Node. The comfortable, over-used pattern: Cancer in the 1st, a self built around emotional self-protection, family-of-origin habits, and withdrawal presented as care. Its exact conjunction to the fixed star Pollux, traditionally martial, suggests this default carries more readiness for conflict than its gentle Cancerian surface lets on.`,
-
-  'Black Moon Lilith': `In Sagittarius in the 6th house, conjunct the fixed star Al Niyat, part of the intense, transformative Scorpio-adjacent star cluster near Antares. The untamed, unintegrated instinct here insists on its own beliefs and refuses to perform discipline for its own sake, specifically in the domain of daily work and routine. Its exact opposition to the Moon is structural: the part of the self that wants to stay wild and the part that wants quiet emotional safety are natally opposed, not a problem to solve once but a tension to keep actively reconciling. Its exact sextile to Saturn is the resource: this wildness, when it needs to, can borrow real discipline rather than dissipating.`,
-
-  'Ascendant': `Cancer rising presents first as attuned and protective, someone who reads a room's emotional temperature before speaking into it. Its ruler, the Moon, sits hidden in the 12th house (see Moon), meaning the persona is genuine, not a mask, but it is a threshold onto a self that does most of its actual living somewhere far more private.`,
-
-  'Midheaven': `Pisces at the Midheaven makes for a vocation that's porous and translative: work that takes something intangible, belief, feeling, the symbolic weight of history, and makes it legible to other people. Chiron's near-exact trine to this point is the chart's single clearest statement about vocation: the wound described under Chiron isn't separate from the work. It is close to being the work's actual material.`,
-
-  'Ceres': `Retrograde in Libra, in the 5th (Placidus) or 4th (whole-sign) house. Nurturance here is relational and aesthetic rather than purely instinctive, care expressed through balance, fairness, and the deliberate shaping of a beautiful or well-ordered environment, extended toward creative work and home alike.`,
-
-  'Pallas': `Retrograde in Virgo in the 3rd house. A strategic intelligence built for close analysis and precise communication, pattern-recognition applied at the level of the sentence and the argument, consistent with, and reinforcing, the editing instinct already visible in Mercury.`,
-
-  'Juno': `In Capricorn in the 7th house, close to the North Node. Committed partnership is approached seriously here, wanting a peer who can meet real structural expectations, not a romantic ideal but a working equal.`,
-
-  'Vesta': `In Gemini in the 12th house, alongside Venus and the Moon. Devotion here is intellectual and largely private: what gets tended with real discipline is the inner life of language and thought, work done in solitude rather than in front of others.`,
-},
-
-dignitySynthesis: `Only two of the seven traditional planets carry any essential dignity, and they sit at opposite ends of the scale. Saturn is domicile and day-triplicity ruler in Aquarius, the strongest thing in the chart by a wide margin, giving real structural authority in the 8th house. The Sun is exalted and day-triplicity ruler in Aries, strong but combust, its confidence pre-filtered through a retrograde Mercury before it goes public. Mars sits at the other extreme, in its classical Fall in Cancer, the chart's most afflicted placement, its force buried in the 12th house even while it sits conjunct the Ascendant itself. Moon, Mercury, Venus, and Jupiter are all peregrine: none carry inherent dignity, so each takes its character almost entirely from house, aspect, and sign rather than an inborn strength. Practically, this describes a personality with two genuinely reliable anchors, disciplined structural competence and confident, if pre-edited, self-assertion, and a wide middle ground (mind, love, luck, feeling) that has to be actively built rather than assumed.`,
-
-dispositors: {
-  modern: `Two closed loops and one lone terminus. Mars, Moon, and Mercury dispose of each other in a locked three-way circuit, with the Sun, Venus, and Jupiter all feeding into it, meaning instinct, feeling, and thought answer only to each other, not to anything steadier. Saturn and Uranus form a second closed loop, with Neptune feeding in: structure and rupture locked in permanent, productive argument rather than one ever fully winning. Pluto disposits only itself, dignified and autonomous, answering to nothing else in the chart. The reactive, verbal, feeling-driven engine runs the show for most of the personality; transformation runs entirely on its own authority.`,
-  traditional: `Collapsing to the older rulerships changes the shape. Saturn becomes sole final dispositor of itself, Uranus, and Neptune, meaning structure genuinely wins that argument rather than fighting Uranus to a draw; the outer, transpersonal material answers to Saturnian discipline in the end. Pluto stops standing alone and folds into the Mars-Moon-Mercury loop, its ruler under this system, meaning transformation happens through instinct, feeling, and thought rather than as an isolated, self-authorizing force. The traditional read is more integrated: two centers of gravity instead of three, and one clean hierarchy where structure has the final word.`,
-},
-
-fixedStars: {
-  'Uranus|Vega': `Vega is one of the sky's brightest stars, traditionally linked to artistic gift, charisma, and a hypnotic, almost seductive quality of influence. Conjunct Uranus in the 7th, it charges encounters with significant others with a magnetic, sudden pull, the kind of charisma that can feel outsized on arrival.`,
-  'Chiron|Pollux': `Pollux carries a traditionally Mars-natured character: combativeness, physical assertion, sometimes rashness. Sitting on Chiron in the 1st house, it ties the original wound to exposure, to force or conflict met before the self had the resources to meet it well.`,
-  'South Node|Pollux': `The same martial star sits exactly on the South Node. The well-worn, default pattern (Cancer in the 1st, self-protection presented as gentleness) carries more combative readiness under the surface than its soft Cancerian coloring suggests.`,
-  'Chiron|Castor': `Castor is traditionally Mercury-natured: quick, verbal, cerebral. Conjunct Chiron alongside its twin Pollux, it places the wound exactly between the two poles the twins represent, a mind fast enough to see everything and a body once exposed to more force than that quickness could counter.`,
-  'Black Moon Lilith|Alniyat': `Al Niyat sits in the intense, transformative star cluster near Antares, the heart of Scorpio. Conjunct Lilith in the 6th house, it deepens the untamed instinct's expression in daily work and routine, adding a penetrating, hard-to-categorize quality that resists domestication specifically in that domain.`,
-  'Pluto|Zuben Eschamali': `Zuben Eschamali, "the Northern Claw," carries a traditionally fortunate, justice-adjacent character. Sitting almost exactly on Pluto in the 5th house, it is a genuinely rare, tight contact: Pluto's usual all-or-nothing intensity paired with a thread of eventual vindication, power in creative and romantic matters that tends, over time, to be proven right rather than simply feared.`,
-},
-
-arabicParts: {
-  'Part of Fortune': `In Leo in the 2nd house. Material and bodily wellbeing here track visible self-expression and creative confidence rather than hidden means; fortune favors being seen doing the thing well, not staying quiet about it.`,
-  'Part of Spirit': `In Taurus in the 11th house. The active will operates through patient, grounded, sustained effort aimed at long-term or collective goals, not quick individual moves. Persistence, not speed, is the native strategy.`,
-  'Part of Eros': `In Cancer in the 1st house, close to the Ascendant itself. Erotic and passionate drive is bound up with self-image and emotional exposure; being desired and being emotionally legible to another person are close to the same experience here.`,
-  'Part of Necessity': `In Scorpio in the 5th house. What feels unavoidable or required attaches to creative self-expression, and Scorpio gives it a compulsive, high-stakes character: creative output that doesn't feel optional once it's underway.`,
-  'Part of Courage': `In Taurus in the 11th house, alongside the Part of Spirit. Courage here looks like steady persistence toward long-range or communal goals rather than a single dramatic act.`,
-  'Part of Victory': `In Virgo in the 3rd house. Success tracks precise communication, editing, and analysis directly, a striking match with the actual profession, and with Mercury and Pallas both pointing the same direction.`,
-  'Part of Nemesis': `In Sagittarius in the 6th house. The point of greatest vulnerability is overextension in belief or meaning-seeking, showing up specifically in the domain of work and daily routine rather than as an abstract philosophical risk.`,
-  'Part of Marriage': `In Scorpio in the 5th house. Commitment is approached with real intensity and stakes, not lightly, and its placement in the house of romance and creative self-expression ties partnership closely to what gets made and performed, not kept separate from it.`,
-},
-
-harmonics: {
-  '5': `The 5th harmonic, astrology's traditional register for talent and craft, lights up around the Midheaven and the Ascendant-Mars axis: Chiron trine Midheaven, the Sun opposite Midheaven, Mars conjunct Ascendant, Uranus square Pluto. Talent here isn't decorative, it is built directly out of the wound (Chiron), asserted forcefully on contact (Mars-Ascendant), and tested against real structural pressure (Uranus-Pluto). This is a harmonic that rewards making the difficult material itself into the craft, rather than smoothing it out before it reaches the page.`,
-  '7': `The 7th harmonic, tied to inspiration, imagination, and forms of dissolution, produces the single tightest aspect anywhere in this analysis: Neptune exactly trine the Ascendant. Imagination isn't a separate faculty layered onto the personality here, it's built into first impression itself. The Sun sextile the nodal axis and Mars trine Neptune reinforce it: inspired, image-driven thinking is a genuine, well-supported talent, not an occasional visitor.`,
-  '9': `The 9th harmonic, associated with completion and belief, clusters heavily around the angles and the wounded-healer material again: Saturn trine and sextile the nodal axis, Chiron trine the Ascendant and conjunct the Midheaven, the Ascendant itself trine the Midheaven. Belief, in this chart, completes itself through vocation and public identity rather than private conviction alone. Whatever gets resolved here tends to resolve in the world, visibly, rather than staying internal.`,
-},
-
-aspects: {
-  'Black Moon Lilith|Saturn|Sextile': `The chart's most dignified planet and its wildest point cooperate easily. Discipline doesn't suppress the untamed instinct, it gives it a container sturdy enough to actually act from.`,
-  'Chiron|Midheaven|Trine': `The original wound wires almost directly into public vocation. What was once injury becomes, without much forcing, recognizable authority in the working world.`,
-  'Ascendant|Mars|Conjunction': `Mars in its Fall is nonetheless the very first thing that registers on meeting this person, intensity felt on arrival even though its owner may experience that same force as buried or indirect. What reads as presence from outside can feel, from inside, like something held back.`,
-  'Black Moon Lilith|Moon|Opposition': `The need for emotional safety and the refusal to be tamed sit at genuine odds. Choosing security can feel like betraying the wild self; choosing wildness can feel unsafe. Both are true, and the tension is structural, not a problem to solve once and be done with.`,
-  'Moon|Saturn|Trine': `Emotional need and the capacity for structure are natural allies. Feelings, however privately held, can be organized and trusted to bear real weight rather than dissolve under pressure.`,
-  'Mercury|North Node|Square': `The habitual, well-worn way of thinking sits at odds with the direction of growth. Old patterns of speaking too fast, or not at all, get tested directly against the discipline the North Node is asking for.`,
-  'Saturn|Venus|Trine': `Affection, once given, tends to last. This placement supports long-term loyalty even though Venus itself would rather stay light and private; Saturn's steadying influence is a genuine asset to romantic continuity.`,
-  'Chiron|Mercury|Square': `The mind and the old wound are in active friction. Words can reopen the injury even without intending to, and precise, edited language is likely both the site of the wound and its most effective treatment.`,
-  'Black Moon Lilith|Venus|Opposition': `What is loved and what refuses domestication pull in opposite directions. Attraction to what can't be tamed is native here, and so is the difficulty reconciling that pull with Venus's own preference for lightness.`,
-  'Moon|Venus|Conjunction': `Emotional need and romantic affection are nearly a single signal. What makes this person feel safe and what makes them fall for someone are, in practice, close to indistinguishable.`,
-  'Chiron|North Node|Opposition': `The old wound sits almost exactly on the nodal axis. Healing and growth aren't separate projects here; moving toward the North Node's material is, structurally, the same motion as working with the wound itself.`,
-  'Midheaven|North Node|Sextile': `The chart's developmental axis connects easily to vocation. Public work is a legitimate, structurally supported venue for the growth process, not a distraction from it.`,
-  'Jupiter|Venus|Sextile': `A genuine talent for pleasure, generosity, and social warmth, available easily and without much internal conflict.`,
-  'Midheaven|Pluto|Trine': `Concentrated, undiluted intensity finds an easy public outlet. Authority accrues less through visibility than through the sense, in others, that this person has actually been somewhere most people haven't.`,
-  'Chiron|Pluto|Trine': `The concentrated intensity and the original wound are allies rather than adversaries. Depth of feeling, even at its most extreme, tends to serve the healing process here rather than derail it.`,
-  'Jupiter|Saturn|Opposition': `The classical tension between expansion and limitation. Confidence in resources meets the reality-testing of the chart's most dignified planet; the correction reads as a built-in audit, not a genuine threat.`,
-  'Black Moon Lilith|Jupiter|Trine': `Confidence and the untamed instinct cooperate. Self-worth doesn't require suppressing what's wild or unconventional, if anything the wildness is a legitimate source of it.`,
-  'Jupiter|Moon|Sextile': `Emotional life runs fundamentally optimistic and generously proportioned, even given its private, 12th-house expression.`,
-  'Neptune|Pluto|Sextile': `A generational current, shared by the whole cohort, but present here as background compatibility between the idealizing register and the concentrated, transformative one. Imagination and depth aren't at war.`,
-  'North Node|Pluto|Sextile': `Growth is supported, not opposed, by Pluto's concentrated intensity. The developmental work of this lifetime can draw on real depth rather than needing to avoid it.`,
-  'North Node|Sun|Square': `Core identity sits in active tension with the growth direction. Solar confidence built around groups and causes has to be actively reconciled with the North Node's more solitary, structural discipline; the two don't automatically agree.`,
-  'Midheaven|Neptune|Sextile': `Vocation carries a real imaginative charge, consistent with, and reinforcing, the Piscean Midheaven itself.`,
-  'Chiron|Neptune|Opposition': `Idealization and the original wound are in tension. The tendency to dissolve hard edges can obscure the wound rather than heal it if left unchecked; clarity has to be actively chosen over comfortable haze.`,
-  'Mercury|Sun|Conjunction': `Thinking and self-assertion arrive fused, with the Sun's confidence largely dependent on Mercury's approval before it goes public. Combust at this orb, in classical terms, means the mind's own light is absorbed into the will's, not extinguished by it.`,
-  'Mercury|Neptune|Square': `Thinking and idealization pull against each other. Precision, this chart's real gift once past the retrograde editing process, can blur under Neptune's influence, exactly the kind of soft error a scrupulous editor wouldn't expect from themselves.`,
-  'Chiron|Sun|Square': `Core identity and the original wound are in active friction. Solar confidence and the old injury don't fully coexist without effort; the wound can undercut assurance episodically even when the rest of the chart argues it shouldn't.`,
-  'Ascendant|Uranus|Opposition': `A need for independence meets the self as presented to others directly. Partnership (Uranus in the 7th) periodically requires a kind of freedom that can look, from the outside, like sudden distance.`,
-  'Mars|Uranus|Opposition': `Already-indirect force meets a need for sudden independence, especially in partnership. Assertion can arrive as an unexpected break rather than a steady confrontation.`,
-  'Neptune|North Node|Conjunction': `Growth is colored by idealism, sometimes romanticizing the very structures the North Node is asking to be built. Worth watching so the discipline being developed doesn't stay purely conceptual.`,
-  'Jupiter|Sun|Square': `Confidence can outrun what current means actually support. Not a flaw so much as a tendency worth checking against the ledger now and then.`,
-},
-
-};
-
-if(typeof module !== 'undefined') module.exports = INTERP;
-if(typeof window !== 'undefined') window.INTERP = INTERP;
-
+// Populated at init from charts.interp_json (per-user generated readings --
+// see worker/chat-worker.js's /generate-readings route). Declared here so
+// every later script tag's bare INTERP.xxx reads keep working unchanged.
+let INTERP;
 </script>
 <script>
 let AD, NATAL;
@@ -1238,20 +1256,83 @@ function findAspectInterp(p1,p2,aspect){
   }
   return null;
 }
+const KEY_ASPECT_COUNT = 10;
+// Always returns real cards for the tightest aspects, using the personalized
+// AI reading where generation produced one and a deterministic, chart-
+// grounded fallback (see fallbackAspectReading below) otherwise -- previously
+// this silently dropped any aspect the model didn't happen to comment on,
+// which meant "Key Aspects" could render near-empty for an account whose
+// interp_json was null or partial.
 function collectKeyAspects(){
-  const seen = new Map();
-  NATAL.aspects.forEach(a=>{
-    const interp = findAspectInterp(a.p1,a.p2,a.aspect);
-    if(!interp) return;
-    if(!seen.has(interp) || a.orb < seen.get(interp).orb){
-      seen.set(interp, {orb:a.orb, p1:a.p1, p2:a.p2, aspect:a.aspect, interp});
-    }
-  });
-  return [...seen.values()].sort((x,y)=>x.orb-y.orb);
+  return [...NATAL.aspects].sort((a,b)=>a.orb-b.orb).slice(0, KEY_ASPECT_COUNT).map(a=>({
+    orb:a.orb, p1:a.p1, p2:a.p2, aspect:a.aspect,
+    interp: findAspectInterp(a.p1,a.p2,a.aspect) || fallbackAspectReading(a),
+  }));
 }
 function readingP(text){ return el('p',{class:'reading', html:annotateTerms(text)}); }
 function ledeP(text, extraStyle){ return el('p',{class:'lede', style:extraStyle||'', html:annotateTerms(text)}); }
 function divider(){ return el('div',{class:'divider'},[el('div',{class:'line'})]); }
+
+// ---------- FALLBACK READINGS ----------
+// Deterministic, chart-grounded prose used wherever a personalized
+// AI-generated reading (INTERP.*) is missing -- generation failed, hasn't
+// run yet, or (the Whole Sign variant) hasn't been requested yet. Built from
+// the same computed chart data the AI readings are grounded in, so a panel
+// never goes blank or drops content while interp_json catches up.
+function fallbackPlacementReading(name, natal){
+  const p = natal.points[name];
+  if(!p) return '';
+  const house = pointHouse(p);
+  const dign = natal.dignities && natal.dignities[name];
+  const dignStr = dign ? `, ${dign.tags.length ? dign.tags.join(', ') : 'peregrine'}` : '';
+  const domain = NATAL_DOMAIN[name];
+  return `${fmtPos(p)}${house?', house '+house:''}${dignStr}${p.retrograde?', retrograde':''}.${domain?' Governs '+domain+'.':''}`;
+}
+function fallbackAspectReading(a){
+  const mode = ASPECT_MODE[a.aspect] || 'contacts';
+  const d1 = NATAL_DOMAIN[a.p1], d2 = NATAL_DOMAIN[a.p2];
+  const tie = (d1 && d2) ? ` — tying ${d1} directly to ${d2}` : '';
+  return `${a.p1} ${mode} ${a.p2}, orb ${a.orb.toFixed(2)}°${tie}.`;
+}
+function fallbackDignitySynthesis(natal){
+  const entries = Object.entries(natal.dignities || {});
+  if(!entries.length) return '';
+  const sorted = [...entries].sort((a,b)=>b[1].score-a[1].score);
+  const [strongName, strong] = sorted[0], [weakName, weak] = sorted[sorted.length-1];
+  const scoreStr = d => `${d.score>=0?'+':''}${d.score}`;
+  let out = `By essential dignity, ${strongName} is the most dignified planet here (${strong.tags.join(', ')||'peregrine'}, ${scoreStr(strong)}), while ${weakName} is the most afflicted (${weak.tags.join(', ')||'peregrine'}, ${scoreStr(weak)}).`;
+  const peregrine = entries.filter(([,d])=>d.score===0).map(([n])=>n);
+  if(peregrine.length) out += ` ${peregrine.join(', ')} ${peregrine.length===1?'carries':'carry'} no essential dignity at all, taking character entirely from house and aspect.`;
+  return out;
+}
+function fallbackDispositorSynthesis(chains){
+  const termini = new Map();
+  Object.entries(chains || {}).forEach(([planet,chain])=>{
+    const last = chain[chain.length-1];
+    if(!termini.has(last)) termini.set(last, []);
+    termini.get(last).push(planet);
+  });
+  return [...termini.entries()].map(([term,planets])=>`${planets.join(', ')} ultimately answer${planets.length===1?'s':''} to ${term}`).join('; ') + '.';
+}
+function fallbackStarReading(h){
+  const domain = NATAL_DOMAIN[h.point];
+  return `${h.point} sits ${h.orb.toFixed(2)}° from ${h.star}, close enough by the traditional 1.5° orb for the star's fixed character to color ${domain||'how '+h.point+' operates'} natally.`;
+}
+function fallbackLotReading(name, p){
+  const house = partHouse(p);
+  return `Falls at ${fmtPos(p)}${house?', house '+house:''}${house?', governing '+(HOUSE_DOMAIN[house]||'this area of life'):''}.`;
+}
+function fallbackOverview(natal){
+  const asc = natal.points['Ascendant'], sun = natal.points['Sun'], moon = natal.points['Moon'];
+  const sunHouse = pointHouse(sun), moonHouse = pointHouse(moon);
+  return `Ascendant in ${asc.sign}, ruled by ${natal.chart_ruler.modern}${natal.chart_ruler.modern!==natal.chart_ruler.traditional?' (traditional: '+natal.chart_ruler.traditional+')':''}. Sun in ${sun.sign}${sunHouse?', house '+sunHouse:''}; Moon in ${moon.sign}${moonHouse?', house '+moonHouse:''}. A ${natal.sect.is_day?'day':'night'} chart, sect light ${natal.sect.light}.`;
+}
+function fallbackHarmonicSynthesis(h, data){
+  const theme = HARMONIC_THEME[h] || 'a distinct';
+  const tightest = [...(data.aspects||[])].sort((a,b)=>a.orb-b.orb)[0];
+  if(!tightest) return `No tight aspects surface in the ${h}th harmonic (${theme} pattern) for this chart.`;
+  return `The ${h}th harmonic brings a ${theme} pattern into focus. Its tightest aspect here is ${describeHarmonicAspect(tightest, h)}`;
+}
 
 // ---------- GLOSSARY / HOVER DEFINITIONS ----------
 const GLOSSARY = {
@@ -1310,7 +1391,7 @@ Object.keys(GLOSSARY).forEach(k=>{ GLOSSARY_LOWER[k.toLowerCase()] = GLOSSARY[k]
 const GLOSSARY_KEYS_SORTED = Object.keys(GLOSSARY).sort((a,b)=>b.length-a.length);
 function escapeRegex(s){ return s.replace(/[.*+?^${}()|[\]\\]/g,'\\UI_JS'); }
 const GLOSSARY_REGEX = new RegExp('\\b(' + GLOSSARY_KEYS_SORTED.map(escapeRegex).join('|') + ')\\b', 'gi');
-function escapeHtml(s){ return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHtml(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function annotateTerms(text){
   const escaped = escapeHtml(text);
   return escaped.replace(GLOSSARY_REGEX, (m)=>{
@@ -1358,7 +1439,7 @@ function renderOverview(container){
     const item = el('div',{class:'item'});
     item.appendChild(el('div',{class:'glyph-big', text:p.glyph?TXT(p.glyph):'\u2191'}));
     item.appendChild(el('div',{class:'label', text:label}));
-    item.appendChild(el('div',{class:'value', text: fmtPos(p) + (label!=='Ascendant' ? ` \u00b7 house ${p.house_placidus}` : '')}));
+    item.appendChild(el('div',{class:'value', text: fmtPos(p) + (label!=='Ascendant' ? ` \u00b7 house ${pointHouse(p)}` : '')}));
     row.appendChild(item);
   });
   bt.appendChild(row);
@@ -1403,11 +1484,7 @@ function renderOverview(container){
     focusCard.innerHTML = '';
     const heading = type==='angle' ? name : `${name} in ${p.sign}`;
     focusCard.appendChild(el('div',{class:'card-title', text: heading}));
-    if(text){
-      focusCard.appendChild(readingP(text));
-    } else {
-      focusCard.appendChild(ledeP(`${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}.`));
-    }
+    focusCard.appendChild(readingP(text || fallbackPlacementReading(name, N)));
     [...pqv.children].forEach(b=>b.classList.toggle('active', b.dataset.name===name));
   }
 
@@ -1467,7 +1544,7 @@ function ordSuf(n){ const s=['th','st','nd','rd'], v=n%100; return s[(v-20)%10]|
 function wheelPlanetTooltipText(name){
   const p = NATAL.points[name];
   if(!p) return name;
-  const houseStr = p.house_placidus ? `, house ${p.house_placidus}` : '';
+  const houseStr = pointHouse(p) ? `, house ${pointHouse(p)}` : '';
   const retro = p.retrograde ? ', retrograde' : '';
   const def = GLOSSARY_LOWER[name.toLowerCase()];
   return `${fmtPos(p)}${houseStr}${retro}.` + (def ? ` ${def}` : '');
@@ -1553,7 +1630,7 @@ function renderWheelPanel(container){
   const wrap = el('div');
   wrap.appendChild(el('p',{class:'eyebrow', text:'The Wheel'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Natal Chart'}));
-  wrap.appendChild(ledeP('Placidus houses. Ascendant fixed at the left. Red lines mark the four angles; grey lines mark intermediate house cusps. Verdigris lines are soft aspects, red lines are hard aspects, dotted grey lines are quincunxes. Hover a planet for its exact placement.'));
+  wrap.appendChild(ledeP(`${HOUSE_SYSTEM==='whole_sign'?'Whole Sign':'Placidus'} houses. Ascendant fixed at the left. Red lines mark the four angles; grey lines mark intermediate house cusps. Verdigris lines are soft aspects, red lines are hard aspects, dotted grey lines are quincunxes. Hover a planet for its exact placement.`));
   const ww = el('div',{class:'wheel-wrap', html: buildWheelSVG(NATAL)});
   wrap.appendChild(ww);
   wireWheelTooltip(ww);
@@ -1611,7 +1688,9 @@ function renderWheelPanel(container){
 
   const highlights = el('div',{class:'card'});
   highlights.appendChild(el('div',{class:'card-title', text:'The Reading'}));
-  INTERP.overview.split('\n\n').forEach(para=>highlights.appendChild(readingP(para)));
+  const overviewParas = (INTERP.overview || '').split('\n\n').filter(Boolean);
+  if(overviewParas.length){ overviewParas.forEach(para=>highlights.appendChild(readingP(para))); }
+  else { highlights.appendChild(readingP(fallbackOverview(N))); }
   wrap.appendChild(highlights);
 
   container.appendChild(wrap);
@@ -1639,13 +1718,11 @@ function renderPlacements(container){
     tr.appendChild(el('td',{class:'num', text:p.house_placidus||'\u2014'}));
     tr.appendChild(el('td',{class:'num', text:p.house_whole_sign||'\u2014'}));
     tr.appendChild(el('td',{class:'num', text: p.speed!==null && p.speed!==undefined ? p.speed.toFixed(4) : '\u2014'}));
-    if(INTERP.placements[name]){
-      tr.style.cursor = 'pointer';
-      tr.onclick = () => {
-        const target = document.getElementById('reading-'+name.replace(/\s+/g,'-'));
-        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
-      };
-    }
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => {
+      const target = document.getElementById('reading-'+name.replace(/\s+/g,'-'));
+      if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+    };
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -1655,11 +1732,11 @@ function renderPlacements(container){
   const readingsGrid = el('div',{class:'grid grid-2'});
   order.forEach(name=>{
     const p = NATAL.points[name];
+    if(!p) return;
     const text = INTERP.placements[name];
-    if(!p || !text) return;
     const card = el('div',{class:'reading-card', id:'reading-'+name.replace(/\s+/g,'-')});
-    card.appendChild(el('div',{class:'rc-head', text:`${p.glyph?TXT(p.glyph):''}  ${name}  \u00b7  ${fmtPos(p)}${p.house_placidus?', house '+p.house_placidus:''}`}));
-    card.appendChild(readingP(text));
+    card.appendChild(el('div',{class:'rc-head', text:`${p.glyph?TXT(p.glyph):''}  ${name}  \u00b7  ${fmtPos(p)}${pointHouse(p)?', house '+pointHouse(p):''}`}));
+    card.appendChild(readingP(text || fallbackPlacementReading(name, NATAL)));
     readingsGrid.appendChild(card);
   });
   wrap.appendChild(readingsGrid);
@@ -1715,7 +1792,7 @@ function renderDignities(container){
   wrap.appendChild(ledeP('Domicile +5, exaltation +4, triplicity +3 (by sect), term +2, face +1. Detriment \u22125, fall \u22124. The seven traditional planets only.'));
   const synCard = el('div',{class:'card'});
   synCard.appendChild(el('div',{class:'card-title', text:'Reading'}));
-  synCard.appendChild(readingP(INTERP.dignitySynthesis));
+  synCard.appendChild(readingP(INTERP.dignitySynthesis || fallbackDignitySynthesis(NATAL)));
   wrap.appendChild(synCard);
   const table = el('table');
   const thead = el('thead');
@@ -1745,7 +1822,7 @@ function renderDispositors(container){
   ['modern','traditional'].forEach(scheme=>{
     const card = el('div',{class:'card'});
     card.appendChild(el('div',{class:'card-title', text: scheme + ' rulerships'}));
-    card.appendChild(readingP(INTERP.dispositors[scheme]));
+    card.appendChild(readingP(INTERP.dispositors[scheme] || fallbackDispositorSynthesis(NATAL.dispositors[scheme].chains)));
     Object.entries(NATAL.dispositors[scheme].chains).forEach(([planet,chain])=>{
       const row = el('div',{class:'chain-row'});
       chain.forEach((node,i)=>{
@@ -1774,7 +1851,7 @@ function renderFixedStars(container){
       const text = INTERP.fixedStars[key];
       const card = el('div',{class:'reading-card'});
       card.appendChild(el('div',{class:'rc-head', html:`${h.point} conjunct ${h.star}  <span class="orb">orb ${h.orb.toFixed(2)}\u00b0</span>`}));
-      if(text) card.appendChild(readingP(text));
+      card.appendChild(readingP(text || fallbackStarReading(h)));
       starsGrid.appendChild(card);
     });
     wrap.appendChild(starsGrid);
@@ -1788,6 +1865,12 @@ function renderLots(container){
   wrap.appendChild(el('p',{class:'eyebrow', text:'Hermetic Lots'}));
   wrap.appendChild(el('h2',{class:'section-title', text:'Arabic Parts'}));
   wrap.appendChild(ledeP('The seven Hermetic lots of Valens plus the lot of marriage, computed by sect.'));
+
+  const explain = el('div',{class:'card'});
+  explain.appendChild(el('div',{class:'card-title', text:'What this is for'}));
+  explain.appendChild(readingP(`Arabic Parts (also called Hermetic Lots) are sensitive points calculated from the angular distance between two planets, projected from the Ascendant -- a third factor derived from the chart rather than a body actually in the sky. The two foundational lots, Fortune and Spirit, are the classical pairing: Fortune (Moon's distance from the Sun, cast from the Ascendant) reads the body and material circumstance, Spirit (the mirror formula, Sun's distance from the Moon) reads the active will. The remaining six -- Eros, Necessity, Courage, Victory, Nemesis, and Marriage -- are built from Fortune or Spirit in turn, each substituting a different planet for a specific concern. Every formula reverses between day and night charts (this is a ${NATAL.sect.is_day?'day':'night'} chart, sect light ${NATAL.sect.light}), since the whole system is oriented by sect from the start.`));
+  wrap.appendChild(explain);
+
   const table = el('table');
   table.appendChild(el('thead',{},[el('tr',{},['Part','Position','House'].map(h=>el('th',{text:h})))]));
   const tbody = el('tbody');
@@ -1795,14 +1878,12 @@ function renderLots(container){
     const tr = el('tr');
     tr.appendChild(el('td',{text:name}));
     tr.appendChild(el('td',{class:'num', text:fmtPos(p)}));
-    tr.appendChild(el('td',{class:'num', text:p.house}));
-    if(INTERP.arabicParts[name]){
-      tr.style.cursor = 'pointer';
-      tr.onclick = () => {
-        const target = document.getElementById('lot-reading-'+name.replace(/\s+/g,'-'));
-        if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
-      };
-    }
+    tr.appendChild(el('td',{class:'num', text:partHouse(p)}));
+    tr.style.cursor = 'pointer';
+    tr.onclick = () => {
+      const target = document.getElementById('lot-reading-'+name.replace(/\s+/g,'-'));
+      if(target) target.scrollIntoView({behavior:'smooth', block:'start'});
+    };
     tbody.appendChild(tr);
   });
   table.appendChild(tbody);
@@ -1812,10 +1893,11 @@ function renderLots(container){
   const lotsGrid = el('div',{class:'grid grid-2'});
   Object.entries(NATAL.arabic_parts).forEach(([name,p])=>{
     const text = INTERP.arabicParts[name];
-    if(!text) return;
     const card = el('div',{class:'reading-card', id:'lot-reading-'+name.replace(/\s+/g,'-')});
-    card.appendChild(el('div',{class:'rc-head', text:`${name}  \u00b7  ${fmtPos(p)}, house ${p.house}`}));
-    card.appendChild(readingP(text));
+    card.appendChild(el('div',{class:'rc-head', text:`${name}  \u00b7  ${fmtPos(p)}, house ${partHouse(p)}`}));
+    const def = GLOSSARY[name];
+    if(def) card.appendChild(ledeP(def, 'margin-bottom:8px;'));
+    card.appendChild(readingP(text || fallbackLotReading(name, p)));
     lotsGrid.appendChild(card);
   });
   wrap.appendChild(lotsGrid);
@@ -1853,7 +1935,7 @@ function renderHarmonicBody(body, h){
   const data = NATAL.harmonics[h];
   const synCard = el('div',{class:'card'});
   synCard.appendChild(el('div',{class:'card-title', text:h+'H Reading'}));
-  synCard.appendChild(readingP(INTERP.harmonics[String(h)]));
+  synCard.appendChild(readingP(INTERP.harmonics[String(h)] || fallbackHarmonicSynthesis(h, data)));
   body.appendChild(synCard);
   const table = el('table');
   table.appendChild(el('thead',{},[el('tr',{},['Point','Position'].map(x=>el('th',{text:x})))]));
@@ -1870,7 +1952,7 @@ function renderHarmonicBody(body, h){
   if(asps.length){
     const card = el('div',{class:'card', style:'margin-top:14px;'});
     card.appendChild(el('div',{class:'card-title', text:'Tightest harmonic aspects (< 1.5\u00b0)'}));
-    asps.forEach(a=>card.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`${a.p1} ${a.aspect} ${a.p2}, orb ${a.orb.toFixed(2)}\u00b0`})));
+    asps.forEach(a=>card.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:describeHarmonicAspect(a, h)})));
     body.appendChild(card);
   }
 }
@@ -1913,19 +1995,33 @@ function renderProgressions(container){
   const progAspects = transitAspects(positions, AD.natalLons, {fast:1.5,personal:1.5,social:1.5,outer:1.5})
                         .filter(a=>a.transiting!==a.natal).slice(0,12);
   if(progAspects.length){
-    const card2 = el('div',{class:'card'});
-    card2.appendChild(el('div',{class:'card-title', text:'Progressed Aspects to Natal (< 1.5\u00b0)'}));
-    progAspects.forEach(a=>card2.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`Progressed ${a.transiting} ${a.aspect} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0`})));
-    wrap.appendChild(card2);
+    wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:'Progressed Aspects to Natal (< 1.5\u00b0)'}));
+    const progGrid = el('div',{class:'grid grid-2'});
+    progAspects.forEach(a=>{
+      const card = el('div',{class:'reading-card'});
+      card.appendChild(el('div',{class:'rc-head', html:`Progressed ${a.transiting} ${a.aspect} natal ${a.natal}  <span class="orb">orb ${a.orb.toFixed(2)}\u00b0</span>`}));
+      card.appendChild(readingP(describeProgressedAspect(AD, a, age)));
+      progGrid.appendChild(card);
+    });
+    wrap.appendChild(progGrid);
   }
 
-  const card3 = el('div',{class:'card'});
-  card3.appendChild(el('div',{class:'card-title', text:`Solar Arc Directions (arc = ${sa.arcDeg.toFixed(3)}\u00b0)`}));
+  wrap.appendChild(el('div',{class:'card-title', style:'margin-top:24px;', text:`Solar Arc Directions (arc = ${sa.arcDeg.toFixed(3)}\u00b0)`}));
   const saAspects = transitAspects(sa.directed, AD.natalLons, {fast:1.2,personal:1.2,social:1.2,outer:1.2})
                       .filter(a=>a.transiting!==a.natal && a.transiting!=='South Node').slice(0,12);
-  if(saAspects.length===0){ card3.appendChild(ledeP('No directed contacts within 1.2\u00b0 right now.')); }
-  saAspects.forEach(a=>card3.appendChild(el('p',{class:'lede', style:'margin-bottom:4px', text:`Directed ${a.transiting} ${a.aspect} natal ${a.natal}, orb ${a.orb.toFixed(2)}\u00b0`})));
-  wrap.appendChild(card3);
+  if(saAspects.length===0){
+    wrap.appendChild(ledeP('No directed contacts within 1.2\u00b0 right now.'));
+  } else {
+    const arcSeries = buildSolarArcSeries(AD);
+    const saGrid = el('div',{class:'grid grid-2'});
+    saAspects.forEach(a=>{
+      const card = el('div',{class:'reading-card'});
+      card.appendChild(el('div',{class:'rc-head', html:`Directed ${a.transiting} ${a.aspect} natal ${a.natal}  <span class="orb">orb ${a.orb.toFixed(2)}\u00b0</span>`}));
+      card.appendChild(readingP(describeSolarArcAspect(AD, a, age, arcSeries)));
+      saGrid.appendChild(card);
+    });
+    wrap.appendChild(saGrid);
+  }
 
   container.appendChild(wrap);
 }
@@ -2111,9 +2207,9 @@ function initApp(){
 
   const { data: { user } } = await supabase.auth.getUser();
   const [{ data: chart, error: chartErr }, { data: sky, error: skyErr }, { data: profile }, starsRes, constLinesRes] = await Promise.all([
-    supabase.from('charts').select('natal_json,prog_json').eq('user_id', user.id).maybeSingle(),
+    supabase.from('charts').select('natal_json,prog_json,interp_json,interp_json_whole_sign').eq('user_id', user.id).maybeSingle(),
     supabase.from('sky_snapshots').select('transit_json').eq('id', 1).maybeSingle(),
-    supabase.from('profiles').select('display_name').eq('id', user.id).maybeSingle(),
+    supabase.from('profiles').select('display_name,house_system').eq('id', user.id).maybeSingle(),
     fetch('stars.json').then(r=>r.json()),
     fetch('constellation-lines.json').then(r=>r.json()),
   ]);
@@ -2127,9 +2223,69 @@ function initApp(){
   window.NATAL_DATA = chart.natal_json;
   window.TRANSIT_DATA = sky.transit_json;
   window.PROGRESSIONS_DATA = chart.prog_json;
+
+  HOUSE_SYSTEM = (profile && profile.house_system === 'whole_sign') ? 'whole_sign' : 'placidus';
+
+  // Every sub-object defaults to {} (not left undefined) so every INTERP.xxx[key]
+  // bracket-access throughout the render functions stays a safe undefined lookup
+  // -- not a TypeError -- for an account whose generation failed, or hasn't been
+  // backfilled yet (interp_json null or partial).
+  function shapeInterp(raw){
+    raw = raw || {};
+    return {
+      overview: raw.overview || '',
+      placements: raw.placements || {},
+      dignitySynthesis: raw.dignitySynthesis || '',
+      dispositors: raw.dispositors || {},
+      fixedStars: raw.fixedStars || {},
+      arabicParts: raw.arabicParts || {},
+      harmonics: raw.harmonics || {},
+      aspects: raw.aspects || {},
+    };
+  }
+  // Whole Sign readings are generated lazily -- see houseSystemToggle's click
+  // handler below -- so a user whose stored preference is 'whole_sign' but
+  // whose generation never completed still gets the Placidus prose rather
+  // than an empty page; the house numbers shown throughout still switch
+  // correctly either way, since those come from natal_json, not interp_json.
+  INTERP = shapeInterp(HOUSE_SYSTEM==='whole_sign' && chart.interp_json_whole_sign ? chart.interp_json_whole_sign : chart.interp_json);
+
   window.USER_DISPLAY_NAME = (profile && profile.display_name) || (user.email ? user.email.split('@')[0] : 'Your Chart');
   window.STAR_DATA = starsRes;
   window.CONSTELLATION_LINES = constLinesRes;
+
+  const houseToggleBtn = document.getElementById('houseSystemToggle');
+  houseToggleBtn.textContent = 'Houses: ' + (HOUSE_SYSTEM==='whole_sign' ? 'Whole Sign' : 'Placidus');
+  houseToggleBtn.addEventListener('click', async ()=>{
+    const target = HOUSE_SYSTEM==='whole_sign' ? 'placidus' : 'whole_sign';
+    houseToggleBtn.disabled = true;
+    try{
+      // Generate once, lazily, the first time anyone on this account switches
+      // to Whole Sign; cached in charts.interp_json_whole_sign from then on,
+      // so every later toggle back to it is just the profile update + reload
+      // below, no generation call.
+      if(target==='whole_sign' && !chart.interp_json_whole_sign){
+        houseToggleBtn.textContent = 'Generating…';
+        const { data: { session: freshSession } } = await supabase.auth.getSession();
+        const res = await fetch(cfg.CHAT_ENDPOINT + '/generate-readings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + freshSession.access_token },
+          body: JSON.stringify({ natal: window.NATAL_DATA, houseSystem: 'whole_sign' }),
+        });
+        if(!res.ok) throw new Error('generation failed: ' + res.status);
+        const { interp } = await res.json();
+        const { error: chartUpdateErr } = await supabase.from('charts').update({ interp_json_whole_sign: interp }).eq('user_id', user.id);
+        if(chartUpdateErr) throw chartUpdateErr;
+      }
+      const { error: profileUpdateErr } = await supabase.from('profiles').update({ house_system: target }).eq('id', user.id);
+      if(profileUpdateErr) throw profileUpdateErr;
+      location.reload();
+    } catch(err){
+      console.error('house system toggle failed:', err);
+      houseToggleBtn.textContent = 'Switch failed — retry';
+      houseToggleBtn.disabled = false;
+    }
+  });
 
   loadingScreen.style.display = 'none';
   appEl.style.display = '';

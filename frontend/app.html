@@ -2197,7 +2197,11 @@ function initApp(){
 <script>
 (async function bootstrap(){
   const cfg = window.DE_CAELO_CONFIG;
-  const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+  // Exposed on window so oracle.js reuses this client instead of creating its
+  // own -- two GoTrueClient instances sharing the same auth storage key can
+  // deadlock each other's session lock (reproduced live: the house-system
+  // toggle's getSession() call hung forever, never even reaching the Worker).
+  const supabase = window.SUPABASE_CLIENT = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
   const loadingScreen = document.getElementById('loadingScreen');
   const loadingDetail = document.getElementById('loadingDetail');
   const appEl = document.getElementById('app');

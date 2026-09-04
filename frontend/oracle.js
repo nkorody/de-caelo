@@ -4,7 +4,9 @@
 (function(){
 
 const cfg = window.DE_CAELO_CONFIG;
-const supabase = window.supabase.createClient(cfg.SUPABASE_URL, cfg.SUPABASE_ANON_KEY);
+// Reuses app.html's client (the only page that loads this script) rather than
+// creating a second one -- see the comment at that client's creation site.
+const supabase = window.SUPABASE_CLIENT;
 
 const toggle = document.getElementById('oracleToggle');
 const drawer = document.getElementById('oracleDrawer');

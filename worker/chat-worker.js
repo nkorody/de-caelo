@@ -53,7 +53,9 @@ export const GENERATE_SYSTEM_PROMPT = `You are writing the full natal-chart read
 
 Tone: dry, direct, declarative. Write the way a technically literate astrologer would write a private reference document, not the way a horoscope app copywriter would. No em dashes. No "not X but Y" constructions. No mystical filler ("the universe is asking you to..."), no stacked qualifiers, no forced optimism. Each piece of text is two to five sentences.
 
-You are producing many separate pieces of text in one response, matching the exact structure requested: one overview paragraph synthesizing the whole chart, one paragraph per placement (planet/point) listed, one paragraph synthesizing essential dignities across the traditional seven, one paragraph for the modern dispositor chain and one for the traditional dispositor chain, one paragraph per fixed-star conjunction listed, one paragraph per Arabic Part listed, one paragraph per harmonic chart (5th, 7th, 9th), and one paragraph per natal aspect listed, in the exact order each list is given. Each piece stands alone -- assume the reader is looking at just that one paragraph next to that one placement or aspect, not reading start to finish, so never refer back to "as mentioned above" or forward to "as we'll see."`;
+You are producing many separate pieces of text in one response, matching the exact structure requested: one overview paragraph synthesizing the whole chart, one paragraph per placement (planet/point) listed, one paragraph synthesizing essential dignities across the traditional seven, one paragraph for the modern dispositor chain and one for the traditional dispositor chain, one paragraph per fixed-star conjunction listed, one paragraph per Arabic Part listed, one paragraph per harmonic chart (5th, 7th, 9th), and one paragraph per natal aspect listed, in the exact order each list is given. Each piece stands alone -- assume the reader is looking at just that one paragraph next to that one placement or aspect, not reading start to finish, so never refer back to "as mentioned above" or forward to "as we'll see."
+
+This is a long, repetitive list, and the entries near the end (lunar nodes, Black Moon Lilith, the angles, the asteroids, the later Arabic Parts) are just as real as Sun and Moon -- every one of them is a specific computed position in this specific chart. Give every single required field, first to last, the same grounded, specific treatment. Never write a stub, a generic filler sentence, or the literal word "placeholder" for any field -- if you are running low on room, write shorter but still real sentences for the remaining entries rather than skipping the substance.`;
 
 // All ~20 points the frontend's INTERP.placements has always covered (§ same).
 // Filtered against natal.points at call time so a chart missing a point (it
@@ -350,44 +352,156 @@ export async function generateReadings(natal, apiKey, houseSystem = 'placidus') 
   const { text: chartContext, placementNames, aspects, stars, partNames } = buildReadingsContext(natal, houseSystem);
   const schema = buildReadingsSchema(placementNames, partNames);
 
-  const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model: 'claude-sonnet-5',
-      // 8192 truncated a real response mid-string (adaptive thinking plus a
-      // ~10-section, ~50-field structured JSON output can run past that) --
-      // reproduced live, not hypothetical. 16000 matches the ceiling already
-      // used for the (much shorter) chat endpoint elsewhere in this file.
-      max_tokens: 16000,
-      output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
-      system: GENERATE_SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: 'CHART DATA:\n\n' + chartContext }],
-    }),
-  });
-
-  if (!apiRes.ok) {
-    throw new Error(`Anthropic API error ${apiRes.status}: ${(await apiRes.text()).slice(0, 500)}`);
+  // The model satisficing on this schema's ~60 required fields (real prose
+  // for prominent placements, literally "placeholder" for the rest -- see
+  // the content guard below) reproduced at both effort:'medium' and
+  // effort:'high', on the identical tail of fields both times -- consistent
+  // enough to look like the model settling into a shortcut on a long
+  // repetitive list rather than a one-off fluke. A stronger system prompt
+  // (above) plus a few retries is the practical mitigation; a schema this
+  // size may just need occasional retries regardless of prompting.
+  const MAX_ATTEMPTS = 3;
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await attemptGenerateReadings(chartContext, schema, apiKey, stars, aspects);
+    } catch (e) {
+      lastErr = e;
+      if (!e.retryable || attempt === MAX_ATTEMPTS) throw e;
+    }
   }
+  throw lastErr;
+}
 
-  const data = await apiRes.json();
-  const textBlock = (data.content || []).find(b => b.type === 'text');
-  if (!textBlock || !textBlock.text) {
-    throw new Error(`empty structured response, stop_reason=${data.stop_reason}`);
+async function attemptGenerateReadings(chartContext, schema, apiKey, stars, aspects){
+  // A stalled connection (no more bytes, no close) left reader.read() below
+  // waiting forever with nothing to time it out -- reproduced live: one
+  // attempt hung 15+ minutes with the retry loop never getting a chance to
+  // fire. This bounds every attempt so a stall becomes a retryable failure
+  // instead of an indefinite hang.
+  const controller = new AbortController();
+  // A fixed overall deadline (tried 120s, then 240s) cut off genuine
+  // in-progress generations before they could finish -- reproduced live: a
+  // whole-sign chart's full ~60-paragraph response at effort:'high' kept
+  // hitting the deadline on all 3 retries despite actively streaming the
+  // whole time (a truly stalled attempt would go silent almost immediately,
+  // not run right up to a 240s cap three times in a row). An IDLE timeout
+  // that resets on every received chunk is the right primitive here: it
+  // only fires when bytes actually stop arriving, so a slow-but-active
+  // generation can run as long as it needs while a genuine stall (no bytes
+  // at all) still can't hang forever.
+  let idleTimeoutId;
+  const armIdleTimeout = () => {
+    clearTimeout(idleTimeoutId);
+    idleTimeoutId = setTimeout(() => controller.abort(new Error('generation stream stalled -- no data received for 45s')), 45000);
+  };
+  armIdleTimeout();
+
+  try {
+    const apiRes = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model: 'claude-sonnet-5',
+        // 8192 truncated a real response mid-string, then 16000 turned out to
+        // still be too low -- reproduced live: a full ~60-paragraph response
+        // (20 placements + dignities + 2 dispositor chains + fixed stars + 8
+        // Arabic parts + 3 harmonics + up to 20 aspects) ran past it, and
+        // output_config.format's schema enforcement doesn't fail loudly on
+        // that -- it backfills whatever required string fields the model
+        // hadn't reached yet with the literal value "placeholder", so
+        // JSON.parse below succeeds and the truncation would otherwise sail
+        // through as a normal response (see the stop_reason check below,
+        // which is what actually catches this).
+        max_tokens: 32000,
+        output_config: { effort: 'high', format: { type: 'json_schema', schema } },
+        system: GENERATE_SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: 'CHART DATA:\n\n' + chartContext }],
+        // Non-streaming timed out at the edge (Anthropic API error 524 --
+        // reproduced live) once max_tokens/effort went up enough to make this
+        // ~60-paragraph response actually take real time to generate.
+        // Streaming keeps the connection alive with incremental bytes instead
+        // of one long silent wait, which is what avoids that edge timeout.
+        stream: true,
+      }),
+    });
+
+    if (!apiRes.ok) {
+      throw new Error(`Anthropic API error ${apiRes.status}: ${(await apiRes.text()).slice(0, 500)}`);
+    }
+
+    let fullText = '';
+    let stopReason = null;
+    const reader = apiRes.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      armIdleTimeout();
+      buf += decoder.decode(value, { stream: true });
+      const events = buf.split('\n\n');
+      buf = events.pop(); // last chunk may be a partial event; keep it for next read
+      for (const evt of events) {
+        const line = evt.split('\n').find(l => l.startsWith('data: '));
+        if (!line) continue;
+        const payload = JSON.parse(line.slice(6));
+        if (payload.type === 'content_block_delta' && payload.delta?.type === 'text_delta') fullText += payload.delta.text;
+        else if (payload.type === 'message_delta' && payload.delta?.stop_reason) stopReason = payload.delta.stop_reason;
+        else if (payload.type === 'error') throw new Error(`Anthropic API stream error: ${JSON.stringify(payload.error).slice(0, 500)}`);
+      }
+    }
+    return finishGenerateReadings(fullText, stopReason, stars, aspects);
+  } catch (e) {
+    if (controller.signal.aborted) { const err = new Error(String(e?.message || e)); err.retryable = true; throw err; }
+    throw e;
+  } finally {
+    clearTimeout(idleTimeoutId);
+  }
+}
+
+function finishGenerateReadings(fullText, stopReason, stars, aspects){
+
+  if (stopReason === 'max_tokens') {
+    const err = new Error('response truncated at max_tokens -- structured output would contain placeholder-filled fields');
+    err.retryable = true;
+    throw err;
+  }
+  if (!fullText) {
+    throw new Error(`empty structured response, stop_reason=${stopReason}`);
   }
 
   let parsed;
-  try { parsed = JSON.parse(textBlock.text); }
+  try { parsed = JSON.parse(fullText); }
   catch (e) {
     // A parse failure here almost always means the response was truncated
     // mid-string -- stop_reason distinguishes that from a genuinely malformed
     // response, which output_config.format's schema enforcement should
     // otherwise rule out.
-    throw new Error(`unparseable structured response (stop_reason=${data.stop_reason}): ${e.message}`);
+    throw new Error(`unparseable structured response (stop_reason=${stopReason}): ${e.message}`);
+  }
+
+  // Direct content guard, independent of stop_reason -- reproduced live at
+  // effort:'medium' with a normal (non-max_tokens) stop_reason: the model
+  // satisficed on this schema's ~60 required fields, writing real prose for
+  // prominent placements and the literal word "placeholder" for the rest.
+  // Schema validity alone doesn't rule this out (a placeholder string is a
+  // valid string), so scan every leaf value for it explicitly.
+  const placeholderFields = [];
+  (function scan(node, path){
+    if (typeof node === 'string') { if (node.trim().toLowerCase() === 'placeholder') placeholderFields.push(path); return; }
+    if (Array.isArray(node)) { node.forEach((v, i) => scan(v, `${path}[${i}]`)); return; }
+    if (node && typeof node === 'object') { for (const [k, v] of Object.entries(node)) scan(v, path ? `${path}.${k}` : k); }
+  })(parsed, '');
+  if (placeholderFields.length) {
+    const err = new Error(`structured response contains literal "placeholder" in: ${placeholderFields.slice(0, 10).join(', ')}`);
+    err.retryable = true;
+    throw err;
   }
 
   // Reassemble the two positionally-ordered arrays into the exact

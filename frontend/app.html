@@ -251,7 +251,10 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 </div>
 <div id="app" style="display:none;">
   <button id="oracleToggle" class="oracle-fab">Ask &#8599;</button>
-  <button id="houseSystemToggle" class="hsys-toggle" title="Switch between Placidus and Whole Sign houses">Houses: Placidus</button>
+  <div class="hsys-toggle" id="houseSystemToggle" role="group" aria-label="House system">
+    <button class="hsys-opt" data-system="placidus" title="Switch to Placidus houses">Placidus</button>
+    <button class="hsys-opt" data-system="whole_sign" title="Switch to Whole Sign houses">Whole Sign</button>
+  </div>
   <div class="tabs" id="tabs"></div>
   <div class="chart-subnav" id="chartSubnav" style="display:none;"></div>
   <div id="panels"></div>
@@ -275,10 +278,13 @@ details.more summary{font-family:var(--mono); font-size:12px; letter-spacing:0.1
 <style>
   .oracle-fab{position:fixed; bottom:20px; right:20px; z-index:150; font-family:var(--mono); font-size:12px; letter-spacing:0.08em; text-transform:uppercase; padding:11px 18px; background:var(--paper); color:var(--ink); border:2px solid var(--paper); cursor:pointer; font-weight:700;}
   .oracle-fab:hover{background:var(--ink); color:var(--paper);}
-  .hsys-toggle{position:fixed; top:16px; right:16px; z-index:150; font-family:var(--mono); font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; padding:8px 13px; background:var(--ink); color:var(--paper); border:2px solid var(--paper); cursor:pointer; font-weight:700;}
-  .hsys-toggle:hover{background:var(--paper); color:var(--ink);}
-  .hsys-toggle:disabled{opacity:0.5; cursor:wait;}
-  @media (max-width:640px){ .hsys-toggle{top:8px; right:8px; padding:6px 10px; font-size:9.5px;} }
+  .hsys-toggle{position:fixed; top:16px; right:16px; z-index:150; display:flex; border:2px solid var(--paper); font-family:var(--mono);}
+  .hsys-opt{font:inherit; font-size:10.5px; letter-spacing:0.06em; text-transform:uppercase; font-weight:700; padding:8px 13px; background:var(--ink); color:var(--paper); border:none; cursor:pointer;}
+  .hsys-opt+.hsys-opt{border-left:2px solid var(--paper);}
+  .hsys-opt:hover:not(.active):not(:disabled){background:var(--paper-dim); color:var(--ink);}
+  .hsys-opt.active{background:var(--paper); color:var(--ink); cursor:default;}
+  .hsys-opt:disabled{opacity:0.5; cursor:wait;}
+  @media (max-width:640px){ .hsys-toggle{top:8px; right:8px;} .hsys-opt{padding:6px 10px; font-size:9.5px;} }
   .scrim{position:fixed; inset:0; background:rgba(0,0,0,0.6); z-index:190; display:none;}
   .scrim.show{display:block;}
   .oracle-drawer{position:fixed; top:0; right:-420px; width:400px; max-width:92vw; height:100%; background:var(--ink); border-left:3px solid var(--paper); z-index:200; transition:right .25s ease; display:flex; flex-direction:column;}
@@ -2258,18 +2264,27 @@ function initApp(){
   window.STAR_DATA = starsRes;
   window.CONSTELLATION_LINES = constLinesRes;
 
-  const houseToggleBtn = document.getElementById('houseSystemToggle');
-  houseToggleBtn.textContent = 'Houses: ' + (HOUSE_SYSTEM==='whole_sign' ? 'Whole Sign' : 'Placidus');
-  houseToggleBtn.addEventListener('click', async ()=>{
-    const target = HOUSE_SYSTEM==='whole_sign' ? 'placidus' : 'whole_sign';
-    houseToggleBtn.disabled = true;
+  // Two-segment control (Placidus | Whole Sign) rather than one button that
+  // flips a single label -- the active side is the one styled filled/inverted
+  // (.active), so which system is live is visible at a glance instead of
+  // only readable from the button's current text.
+  const houseToggleWrap = document.getElementById('houseSystemToggle');
+  const hsysButtons = [...houseToggleWrap.querySelectorAll('.hsys-opt')];
+  function setHsysActive(sys){
+    hsysButtons.forEach(b => b.classList.toggle('active', b.dataset.system === sys));
+  }
+  setHsysActive(HOUSE_SYSTEM);
+  hsysButtons.forEach(btn => btn.addEventListener('click', async ()=>{
+    const target = btn.dataset.system;
+    if(target === HOUSE_SYSTEM) return; // already active -- no-op, not a toggle
+    hsysButtons.forEach(b => b.disabled = true);
     try{
       // Generate once, lazily, the first time anyone on this account switches
       // to Whole Sign; cached in charts.interp_json_whole_sign from then on,
       // so every later toggle back to it is just the profile update + reload
       // below, no generation call.
       if(target==='whole_sign' && !chart.interp_json_whole_sign){
-        houseToggleBtn.textContent = 'Generating…';
+        btn.textContent = 'Generating…';
         const { data: { session: freshSession } } = await supabase.auth.getSession();
         const res = await fetch(cfg.CHAT_ENDPOINT + '/generate-readings', {
           method: 'POST',
@@ -2286,10 +2301,10 @@ function initApp(){
       location.reload();
     } catch(err){
       console.error('house system toggle failed:', err);
-      houseToggleBtn.textContent = 'Switch failed — retry';
-      houseToggleBtn.disabled = false;
+      btn.textContent = 'Failed — retry';
+      hsysButtons.forEach(b => b.disabled = false);
     }
-  });
+  }));
 
   loadingScreen.style.display = 'none';
   appEl.style.display = '';
